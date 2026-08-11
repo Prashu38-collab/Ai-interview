@@ -57,6 +57,7 @@ class EvaluationService:
 
         answer = Answer(question_id=question.id, text=answer_text)
         self.db.add(answer)
+        self.db.flush()  # assign answer.id before creating the evaluation
 
         evaluation_data = ai.evaluate_answer(
             question_text=question.text,
@@ -67,7 +68,7 @@ class EvaluationService:
             answer_text=answer_text,
         )
         evaluation = Evaluation(
-            answer_id=0,  # set after flush
+            answer_id=answer.id,
             score=evaluation_data.score,
             strengths=evaluation_data.strengths,
             weaknesses=evaluation_data.weaknesses,
@@ -84,8 +85,6 @@ class EvaluationService:
         if interview.status in {"ready", "created"}:
             interview.status = "in_progress"
 
-        self.db.flush()  # assign answer.id so evaluation FK can reference it
-        evaluation.answer_id = answer.id
         self.db.commit()
         self.db.refresh(answer)
         self.db.refresh(evaluation)
