@@ -37,7 +37,7 @@ def _make_questioned_interview(client, auth_headers, make_interview, override_ai
 
 
 def test_submit_answer_creates_evaluation(client, auth_headers, make_interview, override_ai):
-    fake, interview_id, questions = _make_questioned_interview(
+    _, interview_id, questions = _make_questioned_interview(
         client, auth_headers, make_interview, override_ai, score=7.0
     )
     qid = questions[0]["id"]

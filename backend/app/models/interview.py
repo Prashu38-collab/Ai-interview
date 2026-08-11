@@ -1,9 +1,14 @@
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import ForeignKey, Integer, JSON, String, Text
+from sqlalchemy import JSON, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.database import Base, TimestampMixin
+
+if TYPE_CHECKING:
+    from app.models.question import Question
+    from app.models.report import InterviewReport
+    from app.models.user import User
 
 
 class Interview(TimestampMixin, Base):

@@ -1,12 +1,12 @@
 """Authentication + authorization services (business logic, no HTTP concerns)."""
 
 from fastapi import HTTPException, status
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from app.core.security import hash_password, verify_password
 from app.models.user import User
 from app.schemas.auth import UserCreate
-from sqlalchemy import select
-from sqlalchemy.orm import Session
 
 
 class AuthService:

@@ -1,9 +1,12 @@
-from typing import Any
+from typing import TYPE_CHECKING
 
-from sqlalchemy import Float, ForeignKey, JSON, String, Text, UniqueConstraint
+from sqlalchemy import JSON, Float, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.database import Base, TimestampMixin
+
+if TYPE_CHECKING:
+    from app.models.answer import Answer
 
 
 class Evaluation(TimestampMixin, Base):

@@ -17,7 +17,6 @@ from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.core.config import get_settings
 from app.db.database import Base, get_db
 from app.main import app
 from app.routers.deps import get_ai_service

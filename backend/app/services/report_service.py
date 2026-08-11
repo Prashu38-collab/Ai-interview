@@ -11,7 +11,6 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.models.interview import Interview
-from app.models.question import Question
 from app.models.report import InterviewReport, SkillScore
 from app.services.ai.base import AIService, CandidateAnalysis
 

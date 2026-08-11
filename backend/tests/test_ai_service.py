@@ -62,7 +62,7 @@ def test_mock_questions_respect_previous():
         difficulty="medium",
         previous_questions=[q.question for q in first],
     )
-    overlap = set(q.question for q in first) & set(q.question for q in second)
+    overlap = {q.question for q in first} & {q.question for q in second}
     assert not overlap
 
 

@@ -1,7 +1,12 @@
+from typing import TYPE_CHECKING
+
 from sqlalchemy import String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.database import Base, TimestampMixin
+
+if TYPE_CHECKING:
+    from app.models.interview import Interview
 
 
 class User(TimestampMixin, Base):

@@ -343,6 +343,7 @@ an API key. SQLite foreign keys are enabled in tests so constraint bugs are caug
 ```bash
 cd backend
 python -m pytest -q        # 51 passed
+ruff check app tests       # lint (see pyproject.toml for the one intentional ignore)
 ```
 
 ## Docker Setup
@@ -430,7 +431,7 @@ Alternatively use the `Dockerfile`s directly on any container platform.
 
 `.github/workflows/ci.yml` runs on every push/PR to `main`:
 
-1. **Backend** — Python 3.12, install deps, `pytest -q`, import sanity check.
+1. **Backend** — Python 3.12, install deps, `ruff check`, `pytest -q`, import sanity check.
 2. **Frontend** — Node 20, `npm ci`, `npm run build`.
 3. **Docker** — `docker compose build` validates both images.
 

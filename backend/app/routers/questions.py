@@ -5,7 +5,11 @@ from app.db.database import get_db
 from app.models.question import Question
 from app.models.user import User
 from app.routers.deps import get_ai_service, get_current_user
-from app.schemas.question import GenerateQuestionsRequest, GenerateQuestionsResponse, QuestionOut
+from app.schemas.question import (
+    GenerateQuestionsRequest,
+    GenerateQuestionsResponse,
+    QuestionOut,
+)
 from app.services.ai.base import AIService
 from app.services.interview_service import InterviewService
 from app.services.question_service import QuestionService
