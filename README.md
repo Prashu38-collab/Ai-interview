@@ -439,9 +439,16 @@ The pipeline fails the build on any test failure.
 
 ## Screenshots
 
-> Screenshots go here once the UI is captured. The app is intentionally minimal:
-> indigo cards, status pills, progress bars, score chips. Run the stack and capture:
-> login → dashboard → new interview → question → report.
+Captured from the running app (mock AI provider):
+
+| | |
+|---|---|
+| **Login** | **Dashboard** |
+| ![Login](docs/screenshots/login.png) | ![Dashboard](docs/screenshots/dashboard.png) |
+| **New interview** | **Interview** |
+| ![New interview](docs/screenshots/new-interview.png) | ![Interview](docs/screenshots/interview.png) |
+| **Report** | |
+| ![Report](docs/screenshots/report.png) | |
 
 ## Future Improvements
 
