@@ -100,7 +100,9 @@ class MockAIService(AIService):
             text = template.format(skill=skill)
             if text not in seen:
                 seen.add(text)
-                concepts = [skill, "best practices"]
+                concepts = [skill]
+                if diff in {"medium", "hard"}:
+                    concepts.append("real-world usage")
                 if diff == "hard":
                     concepts.append("trade-offs")
                 questions.append(
@@ -132,8 +134,25 @@ class MockAIService(AIService):
         missing = [c for c in expected_concepts if c not in covered]
 
         coverage = len(covered) / len(expected_concepts) if expected_concepts else 0.5
-        length_score = min(word_count / 60.0, 1.0)
-        score = round(min(10.0, coverage * 6.5 + length_score * 3.5), 1)
+        length_score = min(word_count / 80.0, 1.0)
+
+        # Technical richness: distinct meaningful words the candidate used.
+        # Real LLM answers score much higher; this keeps the offline demo fair.
+        stopwords = {
+            "this", "that", "with", "have", "from", "their", "they", "about",
+            "which", "there", "when", "what", "where", "were", "been", "will",
+            "into", "than", "then", "them", "over", "such", "these", "those",
+            "used", "using", "thing", "stuff", "very", "just", "because",
+        }
+        terms = {
+            w for w in answer_lower.replace(".", " ").replace(",", " ").split()
+            if len(w) >= 4 and w not in stopwords
+        }
+        richness = min(len(terms) / 12.0, 1.0)
+
+        score = round(min(10.0, 3.5 + coverage * 3.0 + length_score * 1.5 + richness * 2.0), 1)
+        if word_count < 5:
+            score = min(score, 2.0)
 
         strengths = []
         if covered:
