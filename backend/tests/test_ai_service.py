@@ -101,3 +101,54 @@ def test_mock_evaluation_penalizes_short_answers():
         "The event loop schedules and awaits tasks, enabling high concurrency.",
     )
     assert short.score < long.score
+
+
+def _evaluate(ai, answer_text, concepts=("Python",)):
+    return ai.evaluate_answer(
+        question_text="Explain what Python is and give a simple example of where it is used.",
+        skill="Python",
+        difficulty="easy",
+        question_type="conceptual",
+        expected_concepts=list(concepts),
+        answer_text=answer_text,
+    )
+
+
+def test_mock_evaluation_rewards_focused_technical_answers():
+    ai = MockAIService()
+    good = _evaluate(
+        ai,
+        "Python is an interpreted, high-level programming language used for web "
+        "development, automation and data science. I built REST APIs with FastAPI "
+        "and automated data processing with pandas.",
+    )
+    assert good.score >= 7.0
+    assert not good.weaknesses
+
+
+def test_mock_evaluation_punishes_offtopic_padding():
+    ai = MockAIService()
+    ev = _evaluate(
+        ai,
+        "Python is a programming language and it is used everywhere. "
+        "its a snake can eat any animals.",
+    )
+    assert ev.score < 4.5
+    assert any("off-topic" in w for w in ev.weaknesses)
+
+
+def test_mock_evaluation_rejects_generic_gibberish():
+    ai = MockAIService()
+    ev = _evaluate(
+        ai,
+        "I love my dog and the weather is nice today. It is very good and great "
+        "and awesome and fantastic.",
+    )
+    assert ev.score < 3.0
+    assert "Python" in " ".join(ev.weaknesses)
+
+
+def test_mock_evaluation_caps_very_short_answers():
+    ai = MockAIService()
+    ev = _evaluate(ai, "Python is a programming language.")
+    assert ev.score <= 4.5
