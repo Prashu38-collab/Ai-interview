@@ -21,6 +21,12 @@ class Interview(TimestampMixin, Base):
     number_of_questions: Mapped[int] = mapped_column(Integer, default=5, nullable=False)
     duration_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
+    # Adaptive difficulty: the target difficulty for the next question,
+    # updated after each evaluation. easy | medium | hard
+    current_difficulty: Mapped[str] = mapped_column(
+        String(10), default="medium", nullable=False
+    )
+
     # JSON analysis result from the AI (skills, gaps, topics)
     analysis: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
 
