@@ -134,3 +134,37 @@ def test_adaptive_difficulty_clamps_at_bounds(client):
 
     assert adapt_difficulty(9.0, "hard") == "hard"
     assert adapt_difficulty(2.0, "easy") == "easy"
+
+
+def test_same_answer_twice_flags_duplicate(client, auth_headers, make_interview, override_ai):
+    _, _, questions = _make_questioned_interview(client, auth_headers, make_interview, override_ai)
+    text = "Python uses a global interpreter lock to keep memory safe across threads."
+    first = client.post(
+        f"/questions/{questions[0]['id']}/answer", json={"text": text}, headers=auth_headers
+    )
+    second = client.post(
+        f"/questions/{questions[1]['id']}/answer", json={"text": text}, headers=auth_headers
+    )
+    assert first.status_code == second.status_code == 201
+    assert first.json()["duplicate_of"] is None
+    assert first.json()["duplicate_warning"] is None
+    assert second.json()["duplicate_of"] == questions[0]["id"]
+    assert "similar" in second.json()["duplicate_warning"].lower()
+
+
+def test_distinct_answers_not_flagged(client, auth_headers, make_interview, override_ai):
+    _, _, questions = _make_questioned_interview(client, auth_headers, make_interview, override_ai)
+    a = client.post(
+        f"/questions/{questions[0]['id']}/answer",
+        json={"text": "The GIL serializes bytecode execution between threads."},
+        headers=auth_headers,
+    )
+    b = client.post(
+        f"/questions/{questions[1]['id']}/answer",
+        json={"text": "PostgreSQL uses MVCC and write-ahead logging to guarantee ACID transactions."},
+        headers=auth_headers,
+    )
+    assert a.status_code == b.status_code == 201
+    assert a.json()["duplicate_of"] is None
+    assert b.json()["duplicate_of"] is None
+    assert b.json()["duplicate_warning"] is None

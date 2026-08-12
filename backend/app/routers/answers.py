@@ -23,11 +23,13 @@ def submit_answer(
 ) -> AnswerSubmissionResponse:
     """Submit an answer to a question; store it and evaluate it with the AI."""
     question = QuestionService(db).get_owned(question_id, current_user.id)
-    _, evaluation, next_difficulty = EvaluationService(db).submit_answer(
+    _, evaluation, next_difficulty, duplicate_of, duplicate_warning = EvaluationService(db).submit_answer(
         question, payload.text, ai, model_used=ai.name
     )
     return AnswerSubmissionResponse(
         question_id=question.id,
         evaluation=EvaluationOut.model_validate(evaluation),
         next_difficulty=next_difficulty,
+        duplicate_of=duplicate_of,
+        duplicate_warning=duplicate_warning,
     )

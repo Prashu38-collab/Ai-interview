@@ -23,6 +23,7 @@ class AnswerOut(BaseModel):
     id: int
     question_id: int
     text: str
+    duplicate_of: int | None = None
     created_at: datetime
     evaluation: EvaluationOut | None = None
 
@@ -31,3 +32,5 @@ class AnswerSubmissionResponse(BaseModel):
     question_id: int
     evaluation: EvaluationOut
     next_difficulty: str | None = None
+    duplicate_of: int | None = None
+    duplicate_warning: str | None = None
