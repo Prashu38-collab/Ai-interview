@@ -1,0 +1,304 @@
+{
+  "description": "Evaluation benchmark for the mock evaluator. Each case is a (question context, answer) pair with an expected category. Run with: python scripts/run_benchmark.py",
+  "categories": {
+    "correct": "strong, complete answers -> on_topic, score >= 7",
+    "concise_correct": "short but correct answers -> full credit",
+    "alternative_valid": "differently worded but correct answers -> full credit",
+    "partial": "answers covering part of the rubric -> partial, 2 <= score < 7",
+    "incorrect": "answers stating a known misconception -> capped at 4.5",
+    "irrelevant": "off-topic answers (even if technical) -> capped at 2.5",
+    "keyword_stuffing": "dense vocabulary with no structure -> nonsense, capped at 1.5",
+    "verbose_irrelevant": "long padded answers -> stay low",
+    "contradictory": "self-contradictory answers -> capped at 4",
+    "unknown": "honest 'I don't know' -> knowledge_gap, capped at 2",
+    "scenario": "good answer to a scenario question",
+    "debugging": "good answer to a debugging question",
+    "coding": "good answer to a coding question",
+    "system_design": "good answer to a system design question"
+  },
+  "cases": [
+    {
+      "id": "correct-variables-dynamic-typing",
+      "category": "correct",
+      "skill": "Python",
+      "concept": "variables and data types",
+      "question_type": "explanation",
+      "answer": "Python is dynamically typed, so a variable can rebind to different types at runtime. Values are mutable or immutable depending on their type, and the common built-ins are int, float, str, list, dict, tuple and set."
+    },
+    {
+      "id": "correct-decorators-full",
+      "category": "correct",
+      "skill": "Python",
+      "concept": "decorators",
+      "question_type": "explanation",
+      "answer": "Decorators are functions that take a callable and return a wrapped callable. They modify or extend behaviour without changing the original source. Common uses are logging, timing, caching and auth, and functools.wraps preserves metadata."
+    },
+    {
+      "id": "correct-indexes-btree",
+      "category": "correct",
+      "skill": "PostgreSQL",
+      "concept": "indexes",
+      "question_type": "explanation",
+      "answer": "Indexes speed up lookups by scanning less data. A B-tree structure lets the database locate rows quickly, at the cost of write overhead and storage. Partial and covering indexes can shrink that trade-off."
+    },
+    {
+      "id": "correct-dependency-injection",
+      "category": "correct",
+      "skill": "FastAPI",
+      "concept": "dependency injection",
+      "question_type": "explanation",
+      "answer": "FastAPI dependencies use Depends() to share reusable logic. A dependency can be request-scoped, like a database session or the current user. Tests override dependencies to inject fakes."
+    },
+    {
+      "id": "correct-images-and-containers",
+      "category": "correct",
+      "skill": "Docker",
+      "concept": "images and containers",
+      "question_type": "explanation",
+      "answer": "An image is a read-only template, while a container is a running instance of that image. Dockerfiles describe layers, and because images are cached, builds reuse unchanged layers."
+    },
+    {
+      "id": "concise-correct-decorators",
+      "category": "concise_correct",
+      "skill": "Python",
+      "concept": "decorators",
+      "question_type": "explanation",
+      "answer": "A decorator is a function that takes another function and returns a wrapper that adds behaviour before and after the call.",
+      "core_requirements": [
+        "a decorator takes a callable and returns a wrapped callable",
+        "it wraps the call to add behaviour"
+      ]
+    },
+    {
+      "id": "concise-correct-variables",
+      "category": "concise_correct",
+      "skill": "Python",
+      "concept": "variables and data types",
+      "question_type": "explanation",
+      "answer": "Python is dynamically typed and has mutable and immutable built-ins like int, float, str, list, dict."
+    },
+    {
+      "id": "concise-correct-indexes",
+      "category": "concise_correct",
+      "skill": "PostgreSQL",
+      "concept": "indexes",
+      "question_type": "explanation",
+      "answer": "An index speeds up lookups by scanning less data, with some write cost and storage trade-offs. The B-tree structure is how rows are located quickly."
+    },
+    {
+      "id": "partial-decorators-modifies",
+      "category": "partial",
+      "skill": "Python",
+      "concept": "decorators",
+      "question_type": "explanation",
+      "answer": "A decorator modifies a function."
+    },
+    {
+      "id": "partial-variables-builtins-only",
+      "category": "partial",
+      "skill": "Python",
+      "concept": "variables and data types",
+      "question_type": "explanation",
+      "answer": "Python has data types like int, list and dict."
+    },
+    {
+      "id": "partial-indexes-lookup-only",
+      "category": "partial",
+      "skill": "PostgreSQL",
+      "concept": "indexes",
+      "question_type": "explanation",
+      "answer": "An index speeds up lookups."
+    },
+    {
+      "id": "incorrect-decorator-is-a-class",
+      "category": "incorrect",
+      "skill": "Python",
+      "concept": "decorators",
+      "question_type": "explanation",
+      "answer": "A decorator is a class that you annotate methods with."
+    },
+    {
+      "id": "incorrect-list-tuple-interchangeable",
+      "category": "incorrect",
+      "skill": "Python",
+      "concept": "variables and data types",
+      "question_type": "explanation",
+      "answer": "List and tuple are interchangeable, you can swap them everywhere."
+    },
+    {
+      "id": "irrelevant-postgres-for-decorators",
+      "category": "irrelevant",
+      "skill": "Python",
+      "concept": "decorators",
+      "question_type": "explanation",
+      "answer": "PostgreSQL uses B-tree indexes and MVCC for transaction isolation, and a load balancer distributes requests across replicas."
+    },
+    {
+      "id": "irrelevant-weather-ramble",
+      "category": "irrelevant",
+      "skill": "Python",
+      "concept": "decorators",
+      "question_type": "explanation",
+      "answer": "The weather today is great for a long walk in the park. I love coffee and the sky is blue and the birds are singing and the grass is green."
+    },
+    {
+      "id": "irrelevant-react-for-di",
+      "category": "irrelevant",
+      "skill": "FastAPI",
+      "concept": "dependency injection",
+      "question_type": "explanation",
+      "answer": "React components re-render when their props change, and the virtual DOM diffs the previous tree."
+    },
+    {
+      "id": "stuffing-decorators",
+      "category": "keyword_stuffing",
+      "skill": "Python",
+      "concept": "decorators",
+      "question_type": "explanation",
+      "answer": "decorator wrapper functools wraps callable metaclass generator async closure lambda"
+    },
+    {
+      "id": "stuffing-indexes",
+      "category": "keyword_stuffing",
+      "skill": "PostgreSQL",
+      "concept": "indexes",
+      "question_type": "explanation",
+      "answer": "index b-tree query cache transaction mvcc lock latency throughput"
+    },
+    {
+      "id": "verbose-padding-decorators",
+      "category": "verbose_irrelevant",
+      "skill": "Python",
+      "concept": "decorators",
+      "question_type": "explanation",
+      "answer": "A decorator is used in Python everywhere and it is great and awesome and fantastic and wonderful and the best thing ever invented."
+    },
+    {
+      "id": "verbose-padding-variables",
+      "category": "verbose_irrelevant",
+      "skill": "Python",
+      "concept": "variables and data types",
+      "question_type": "explanation",
+      "answer": "Data is important and amazing and fantastic and cool and great and awesome. Types are really nice and wonderful and beautiful."
+    },
+    {
+      "id": "alternative-decorators-wrapper",
+      "category": "alternative_valid",
+      "skill": "Python",
+      "concept": "decorators",
+      "question_type": "explanation",
+      "answer": "A decorator is like a wrapper: given a callable, it returns a new callable, and running the setup or teardown logic before and after the call is exactly what makes it useful.",
+      "core_requirements": [
+        "a decorator takes a callable and returns a wrapped callable",
+        "it runs logic before and after the call"
+      ]
+    },
+    {
+      "id": "alternative-fastapi-depends",
+      "category": "alternative_valid",
+      "skill": "FastAPI",
+      "concept": "dependency injection",
+      "question_type": "explanation",
+      "answer": "In FastAPI you declare dependencies with Depends, and they are resolved per request, which is how a database session gets created and closed for each call. Tests can swap them out with overrides."
+    },
+    {
+      "id": "contradictory-decorators-always-never",
+      "category": "contradictory",
+      "skill": "Python",
+      "concept": "decorators",
+      "question_type": "explanation",
+      "answer": "Decorators always modify the function in place, but they never change the original function."
+    },
+    {
+      "id": "contradictory-indexes-always-never",
+      "category": "contradictory",
+      "skill": "PostgreSQL",
+      "concept": "indexes",
+      "question_type": "explanation",
+      "answer": "Indexes always make queries faster, but they never add any write overhead."
+    },
+    {
+      "id": "unknown-decorators",
+      "category": "unknown",
+      "skill": "Python",
+      "concept": "decorators",
+      "question_type": "explanation",
+      "answer": "I don't know, I haven't studied decorators yet."
+    },
+    {
+      "id": "unknown-query-optimization",
+      "category": "unknown",
+      "skill": "PostgreSQL",
+      "concept": "query optimization",
+      "question_type": "explanation",
+      "answer": "I'm not sure, we haven't covered query plans in my course."
+    },
+    {
+      "id": "scenario-data-structures-dedup",
+      "category": "scenario",
+      "skill": "Python",
+      "concept": "data structures",
+      "question_type": "scenario",
+      "answer": "I would use a set to deduplicate the names, because set membership and insertion are average O(1), which beats scanning a list or tuple. If I needed to store counts per name I'd use a dict with the same time complexity. Choosing the right structure for the problem is the key trade-off."
+    },
+    {
+      "id": "scenario-transactions-acid",
+      "category": "scenario",
+      "skill": "PostgreSQL",
+      "concept": "transactions and ACID",
+      "question_type": "scenario",
+      "answer": "Transactions give ACID properties: a transaction begins, commits or rollback as one unit. MVCC gives isolation levels so concurrent readers see consistent snapshots. Locks and deadlocks still need care."
+    },
+    {
+      "id": "debugging-async-endpoints",
+      "category": "debugging",
+      "skill": "FastAPI",
+      "concept": "async endpoints",
+      "question_type": "debugging",
+      "answer": "I'd check whether the endpoint is declared def or async def. A blocking call inside async code stalls the event loop, so sync I/O belongs in the threadpool; awaiting keeps the loop from blocking."
+    },
+    {
+      "id": "debugging-query-optimization",
+      "category": "debugging",
+      "skill": "PostgreSQL",
+      "concept": "query optimization",
+      "question_type": "debugging",
+      "answer": "Run EXPLAIN ANALYZE and read the plan output. If I see a seq scan where an index scan should be, I check for missing statistics or outdated plans, and I look for N+1 queries."
+    },
+    {
+      "id": "coding-dockerfiles",
+      "category": "coding",
+      "skill": "Docker",
+      "concept": "dockerfiles",
+      "question_type": "coding",
+      "answer": "Use a multi-stage build: a builder stage compiles, then a slim runtime stage copies the artifact, keeping image size small. Order instructions so hot layers stay cached and rebuilds are fast."
+    },
+    {
+      "id": "coding-functions-scoping",
+      "category": "coding",
+      "skill": "Python",
+      "concept": "functions and scoping",
+      "question_type": "coding",
+      "answer": "Define a function with default arguments. Defaults are evaluated once at definition time, so use None for mutable defaults. When calling it, *args and **kwargs accept flexible arguments. Scope follows the LEGB rule: local, enclosing, global, builtins.",
+      "common_misconceptions": [
+        "the local scope is searched after the global scope"
+      ]
+    },
+    {
+      "id": "system-design-load-balancing",
+      "category": "system_design",
+      "skill": "System Design",
+      "concept": "load balancing",
+      "question_type": "system_design",
+      "answer": "A load balancer distributes traffic across servers and performs health checks so requests only go to healthy instances. L4 balancing routes on IP and port, while L7 can route on HTTP paths; the trade-off is that L7 is more flexible but adds latency."
+    },
+    {
+      "id": "system-design-caching",
+      "category": "system_design",
+      "skill": "System Design",
+      "concept": "caching",
+      "question_type": "system_design",
+      "answer": "Use cache-aside or write-through, set a TTL, and plan invalidation so stale data is bounded. The main risk is a cache stampede when many clients miss at once."
+    }
+  ]
+}

@@ -1,30 +1,31 @@
 """Final report: score math, generation flow, and permissions."""
 
-from tests.conftest import (
-    AnswerEvaluation,
-    ControllableAIService,
-    QuestionData,
-)
+from tests.conftest import ControllableAIService, evaluation_dims, question_data
 
 
 def _fully_answered_interview(client, auth_headers, make_interview, override_ai):
     fake = ControllableAIService(
-        evaluation=AnswerEvaluation(
-            score=8.0,
-            strengths=["Good"],
-            weaknesses=["Minor"],
-            feedback="Nice.",
-            missing_concepts=[],
-        ),
+        evaluation=evaluation_dims(8.0),
         questions=[
-            QuestionData(
-                question=f"Skill question {i} about {skill}.",
-                skill=skill,
-                difficulty="medium",
-                question_type="conceptual",
-                expected_concepts=["x"],
-            )
-            for i, skill in enumerate(["Python", "Python", "Docker"])
+            question_data(
+                "Explain how Python's GIL affects threading.",
+                skill="Python",
+                expected_concepts=["GIL"],
+                core_requirements=["Explain the GIL"],
+            ),
+            question_data(
+                "Explain how Python function scoping works.",
+                skill="Python",
+                concept="functions and scoping",
+                expected_concepts=["LEGB"],
+                core_requirements=["Explain scoping"],
+            ),
+            question_data(
+                "Explain how Docker containers isolate processes.",
+                skill="Docker",
+                expected_concepts=["namespaces"],
+                core_requirements=["Explain isolation"],
+            ),
         ],
     )
     override_ai(fake)
@@ -87,20 +88,13 @@ def test_interview_status_becomes_completed(client, auth_headers, make_interview
 
 def test_skill_score_average_math(client, auth_headers, make_interview, override_ai):
     fake = ControllableAIService(
-        evaluation=AnswerEvaluation(
-            score=6.0,
-            strengths=[],
-            weaknesses=[],
-            feedback="ok",
-            missing_concepts=[],
-        ),
+        evaluation=evaluation_dims(6.0),
         questions=[
-            QuestionData(
-                question=f"Python question {i}.",
+            question_data(
+                f"Python question {i}.",
                 skill="Python",
-                difficulty="medium",
-                question_type="conceptual",
                 expected_concepts=["x"],
+                core_requirements=["Explain x"],
             )
             for i in range(2)
         ],
@@ -111,13 +105,13 @@ def test_skill_score_average_math(client, auth_headers, make_interview, override
         f"/interviews/{interview_id}/generate-questions", headers=auth_headers
     ).json()["questions"]
     # One strong answer (overridden score 9) + one weak (overridden 3)
-    fake._evaluation = AnswerEvaluation(score=9.0, strengths=[], weaknesses=[], feedback="", missing_concepts=[])
+    fake._evaluation = evaluation_dims(9.0)
     client.post(
         f"/questions/{questions[0]['id']}/answer",
         json={"text": "strong"},
         headers=auth_headers,
     )
-    fake._evaluation = AnswerEvaluation(score=3.0, strengths=[], weaknesses=[], feedback="", missing_concepts=[])
+    fake._evaluation = evaluation_dims(3.0)
     client.post(
         f"/questions/{questions[1]['id']}/answer",
         json={"text": "weak"},

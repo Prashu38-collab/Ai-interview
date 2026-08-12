@@ -1,29 +1,22 @@
-from tests.conftest import AnswerEvaluation, ControllableAIService, QuestionData
+from tests.conftest import ControllableAIService, evaluation_dims, question_data
 
 
 def _make_questioned_interview(client, auth_headers, make_interview, override_ai, score=7.0):
     fake = ControllableAIService(
-        evaluation=AnswerEvaluation(
-            score=score,
-            strengths=["Good structure"],
-            weaknesses=["Missing examples"],
-            feedback="Solid.",
-            missing_concepts=["event loop"],
-        ),
+        evaluation=evaluation_dims(score),
         questions=[
-            QuestionData(
-                question="Explain Python's GIL.",
+            question_data(
+                "Explain Python's GIL.",
                 skill="Python",
-                difficulty="medium",
-                question_type="conceptual",
                 expected_concepts=["GIL", "threading"],
+                core_requirements=["Explain what the GIL is", "Explain thread safety"],
             ),
-            QuestionData(
-                question="How does PostgreSQL handle transactions?",
+            question_data(
+                "How does PostgreSQL handle transactions?",
                 skill="PostgreSQL",
-                difficulty="medium",
-                question_type="conceptual",
+                concept="transactions and ACID",
                 expected_concepts=["ACID"],
+                core_requirements=["Explain ACID properties"],
             ),
         ],
     )
@@ -50,7 +43,8 @@ def test_submit_answer_creates_evaluation(client, auth_headers, make_interview, 
     body = res.json()
     assert body["question_id"] == qid
     assert body["evaluation"]["score"] == 7.0
-    assert body["evaluation"]["feedback"] == "Solid."
+    assert body["evaluation"]["answer_status"] == "on_topic"
+    assert body["evaluation"]["feedback"]  # feedback is non-empty
 
     status = client.get(f"/interviews/{interview_id}/questions", headers=auth_headers).json()
     assert status[0]["status"] == "answered"

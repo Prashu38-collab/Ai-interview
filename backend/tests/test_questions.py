@@ -1,4 +1,4 @@
-from tests.conftest import ControllableAIService, QuestionData
+from tests.conftest import ControllableAIService, question_data
 
 
 def _answered_question_id(body) -> int:
@@ -8,12 +8,11 @@ def _answered_question_id(body) -> int:
 def test_generate_questions_requires_analysis_capability(client, auth_headers, make_interview, override_ai):
     fake = ControllableAIService(
         questions=[
-            QuestionData(
-                question="What is Python's GIL?",
+            question_data(
+                "What is Python's GIL?",
                 skill="Python",
-                difficulty="medium",
-                question_type="conceptual",
                 expected_concepts=["GIL"],
+                core_requirements=["Explain what the GIL is"],
             )
         ]
     )
@@ -27,7 +26,7 @@ def test_generate_questions_requires_analysis_capability(client, auth_headers, m
     )
     assert res.status_code == 200
     body = res.json()
-    assert body["generated"] == 1
+    assert body["generated"] == 3
     q = body["questions"][0]
     assert q["text"] == "What is Python's GIL?"
     assert q["difficulty"] == "medium"
@@ -37,12 +36,11 @@ def test_generate_questions_requires_analysis_capability(client, auth_headers, m
 def test_generate_questions_is_deduplicated(client, auth_headers, make_interview, override_ai):
     fake = ControllableAIService(
         questions=[
-            QuestionData(
-                question="What is Python's GIL?",
+            question_data(
+                "What is Python's GIL?",
                 skill="Python",
-                difficulty="medium",
-                question_type="conceptual",
                 expected_concepts=["GIL"],
+                core_requirements=["Explain what the GIL is"],
             )
         ]
     )
@@ -65,12 +63,11 @@ def test_generate_questions_is_deduplicated(client, auth_headers, make_interview
 def test_generate_questions_keeps_batch_under_target(client, auth_headers, make_interview, override_ai):
     fake = ControllableAIService(
         questions=[
-            QuestionData(
-                question=f"Question number {i}.",
+            question_data(
+                f"Explain question number {i}.",
                 skill="Python",
-                difficulty="medium",
-                question_type="conceptual",
                 expected_concepts=["x"],
+                core_requirements=["Explain x"],
             )
             for i in range(10)
         ]
@@ -104,12 +101,11 @@ def test_generate_questions_other_user_forbidden(client, auth_headers, make_inte
 def test_list_questions_returns_ordered(client, auth_headers, make_interview, override_ai):
     fake = ControllableAIService(
         questions=[
-            QuestionData(
-                question=f"Ordered question {i}.",
+            question_data(
+                f"Explain ordered question {i}.",
                 skill="Python",
-                difficulty="medium",
-                question_type="conceptual",
                 expected_concepts=["x"],
+                core_requirements=["Explain x"],
             )
             for i in range(3)
         ]
@@ -127,24 +123,43 @@ def test_list_questions_returns_ordered(client, auth_headers, make_interview, ov
 
 def test_regenerate_replaces_pending_questions(client, auth_headers, make_interview, override_ai):
     first_pool = [
-        QuestionData(
-            question=f"First batch question {i}.",
+        question_data(
+            "Explain how Python stores variables and data types.",
             skill="Python",
-            difficulty="medium",
-            question_type="conceptual",
+            concept="variables and data types",
             expected_concepts=["x"],
-        )
-        for i in range(3)
+            core_requirements=["Explain x"],
+        ),
+        question_data(
+            "How do you deduplicate a list while preserving order in Python?",
+            skill="Python",
+            concept="data structures",
+            expected_concepts=["y"],
+            core_requirements=["Explain y"],
+        ),
+        question_data(
+            "Explain Python's LEGB scoping rule.",
+            skill="Python",
+            concept="functions and scoping",
+            expected_concepts=["z"],
+            core_requirements=["Explain z"],
+        ),
     ]
     second_pool = [
-        QuestionData(
-            question=f"Fresh batch question {i}.",
+        question_data(
+            "Compare sets and lists in Python for membership tests.",
             skill="Python",
-            difficulty="medium",
-            question_type="conceptual",
-            expected_concepts=["y"],
-        )
-        for i in range(3)
+            concept="data structures",
+            expected_concepts=["a"],
+            core_requirements=["Explain a"],
+        ),
+        question_data(
+            "Explain how Python generators yield values lazily.",
+            skill="Python",
+            concept="generators and iterators",
+            expected_concepts=["b"],
+            core_requirements=["Explain b"],
+        ),
     ]
 
     fake = ControllableAIService(questions=first_pool)
@@ -173,8 +188,8 @@ def test_regenerate_replaces_pending_questions(client, auth_headers, make_interv
     final = client.get(f"/interviews/{interview_id}/questions", headers=auth_headers).json()
     texts = {q["text"] for q in final}
     # The answered question survives; the two pending ones are replaced fresh.
-    assert "First batch question 0." in texts
-    assert "First batch question 1." not in texts
-    assert "Fresh batch question 0." in texts
+    assert "Explain how Python stores variables and data types." in texts
+    assert "How do you deduplicate a list while preserving order in Python?" not in texts
+    assert "Compare sets and lists in Python for membership tests." in texts
     assert len([q for q in final if q["status"] == "answered"]) == 1
     assert len(final) == 3

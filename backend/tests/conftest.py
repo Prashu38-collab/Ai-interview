@@ -22,11 +22,53 @@ from app.main import app
 from app.routers.deps import get_ai_service
 from app.services.ai.base import (
     AIService,
-    AnswerEvaluation,
     CandidateAnalysis,
+    EvaluationDimensions,
     QuestionData,
     ReportSummary,
 )
+
+
+def evaluation_dims(score: float = 7.0, **overrides) -> EvaluationDimensions:
+    """Build EvaluationDimensions that the score engine maps to ``score``.
+
+    Equal dimension scores + ``on_topic`` status yield exactly ``score`` with
+    the default (equal-ish) weights, keeping legacy tests predictable.
+    """
+    defaults = {
+        "answer_status": "on_topic",
+        "relevance_score": score,
+        "understanding_score": score,
+        "correctness_score": score,
+        "completeness_score": score,
+        "reasoning_score": score,
+        "strengths": ["Good structure"],
+        "confidence": 0.8,
+    }
+    defaults.update(overrides)
+    return EvaluationDimensions(**defaults)
+
+
+def question_data(text: str, skill: str = "Python", **overrides) -> QuestionData:
+    """Build a valid, rubric-carrying QuestionData for tests."""
+    from app.services.ai.concept_bank import CONCEPT_BANK
+
+    specs = CONCEPT_BANK.get(skill)
+    default_concept = specs[0].name if specs else "git"
+    defaults = {
+        "question": text,
+        "skill": skill,
+        "concept": default_concept,
+        "intent": "check understanding",
+        "difficulty": "medium",
+        "question_type": "explanation",
+        "expected_concepts": ["GIL"],
+        "core_requirements": ["Explain what the GIL is"],
+        "optional_depth_points": ["Give an example"],
+        "common_misconceptions": [],
+    }
+    defaults.update(overrides)
+    return QuestionData(**defaults)
 
 
 class ControllableAIService(AIService):
@@ -42,7 +84,7 @@ class ControllableAIService(AIService):
         self,
         analysis: CandidateAnalysis | None = None,
         questions: list[QuestionData] | None = None,
-        evaluation: AnswerEvaluation | None = None,
+        evaluation: EvaluationDimensions | None = None,
         report: ReportSummary | None = None,
         fail_with: Exception | None = None,
     ) -> None:
@@ -53,21 +95,9 @@ class ControllableAIService(AIService):
             topics=["Python", "FastAPI"],
         )
         self._questions = questions or [
-            QuestionData(
-                question="Explain Python's Global Interpreter Lock.",
-                skill="Python",
-                difficulty="medium",
-                question_type="conceptual",
-                expected_concepts=["GIL", "threading"],
-            )
+            question_data("Explain Python's Global Interpreter Lock.", skill="Python")
         ]
-        self._evaluation = evaluation or AnswerEvaluation(
-            score=7.0,
-            strengths=["Good structure"],
-            weaknesses=["Missing examples"],
-            feedback="Solid, but add examples.",
-            missing_concepts=["event loop"],
-        )
+        self._evaluation = evaluation or evaluation_dims(7.0)
         self._report = report or ReportSummary(
             summary="Good performance overall.",
             strengths=["Python"],
@@ -89,7 +119,7 @@ class ControllableAIService(AIService):
         pool = [q for q in self._questions if q.question not in (previous_questions or [])]
         return pool[:number]
 
-    def evaluate_answer(self, **kwargs) -> AnswerEvaluation:
+    def evaluate_answer(self, **kwargs) -> EvaluationDimensions:
         self._maybe_fail()
         return self._evaluation
 
