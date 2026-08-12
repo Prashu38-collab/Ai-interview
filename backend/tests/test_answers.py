@@ -43,7 +43,7 @@ def test_submit_answer_creates_evaluation(client, auth_headers, make_interview, 
     body = res.json()
     assert body["question_id"] == qid
     assert body["evaluation"]["score"] == 7.0
-    assert body["evaluation"]["answer_status"] == "on_topic"
+    assert body["evaluation"]["answer_status"] == "strong"
     assert body["evaluation"]["feedback"]  # feedback is non-empty
 
     status = client.get(f"/interviews/{interview_id}/questions", headers=auth_headers).json()

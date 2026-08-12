@@ -96,18 +96,45 @@ class QuestionPlanSlot(BaseModel):
     follow_up_of: int | None = None
 
 
-# The possible statuses of an evaluated answer. "knowledge_gap" covers
-# "I don't know"; "nonsense" covers keyword stuffing and word salads;
-# "echo" covers answers that just repeat the question back.
+# Possible statuses of an evaluated answer, produced by the Answer Validation
+# stage (non-answers) or the knowledge-evaluation stage (real answers):
+#   - question_repetition: the candidate repeated/copied the question or rubric
+#   - keyword_stuffing: a dense keyword burst with no explanatory structure
+#   - nonsensical: no recognizable content at all
+#   - insufficient_evidence: concept(s) mentioned but nothing explained
+#   - knowledge_gap: "I don't know" (honest non-answer)
+#   - irrelevant: on no relationship to the question's topic
+#   - strong: correct, complete, type-appropriate answer
+#   - partial: real explanation, but rubric requirements left uncovered
+#   - incomplete: relevant, but the question-type requirement was not met
+#     (e.g. a coding question answered without code or an implementation plan)
+#   - incorrect: a known misconception / wrong claim
+#   - contradictory: the answer contradicts itself
 ANSWER_STATUSES: tuple[str, ...] = (
-    "on_topic",
+    "strong",
     "partial",
+    "incomplete",
     "incorrect",
     "irrelevant",
     "knowledge_gap",
     "contradictory",
-    "nonsense",
-    "echo",
+    "keyword_stuffing",
+    "question_repetition",
+    "nonsensical",
+    "insufficient_evidence",
+)
+
+# Statuses that mean the candidate did not produce a real answer. They get
+# hard score gates, no requirement credit, and no follow-up questions.
+NON_ANSWER_STATUSES: frozenset[str] = frozenset(
+    {
+        "question_repetition",
+        "keyword_stuffing",
+        "nonsensical",
+        "insufficient_evidence",
+        "irrelevant",
+        "knowledge_gap",
+    }
 )
 
 
@@ -119,7 +146,7 @@ class EvaluationDimensions(BaseModel):
     final score itself.
     """
 
-    answer_status: str = "on_topic"
+    answer_status: str = "strong"
     relevance_score: float = Field(default=0, ge=0, le=10)
     understanding_score: float = Field(default=0, ge=0, le=10)
     correctness_score: float = Field(default=0, ge=0, le=10)
@@ -128,6 +155,11 @@ class EvaluationDimensions(BaseModel):
     satisfied_requirements: list[str] = Field(default_factory=list)
     partial_requirements: list[str] = Field(default_factory=list)
     missing_requirements: list[str] = Field(default_factory=list)
+    # Mention is not understanding: "Python decorator" mentions the concept but
+    # demonstrates nothing. Only concepts backed by explained/covered content
+    # belong in demonstrated_concepts.
+    mentioned_concepts: list[str] = Field(default_factory=list)
+    demonstrated_concepts: list[str] = Field(default_factory=list)
     technical_errors: list[str] = Field(default_factory=list)
     misconceptions: list[str] = Field(default_factory=list)
     contradictions: list[str] = Field(default_factory=list)
@@ -161,7 +193,7 @@ class AnswerEvaluation(BaseModel):
     """
 
     score: float = Field(ge=0, le=10)
-    answer_status: str = "on_topic"
+    answer_status: str = "strong"
     relevance_score: float = 0
     understanding_score: float = 0
     correctness_score: float = 0
@@ -170,6 +202,8 @@ class AnswerEvaluation(BaseModel):
     satisfied_requirements: list[str] = Field(default_factory=list)
     partial_requirements: list[str] = Field(default_factory=list)
     missing_requirements: list[str] = Field(default_factory=list)
+    mentioned_concepts: list[str] = Field(default_factory=list)
+    demonstrated_concepts: list[str] = Field(default_factory=list)
     technical_errors: list[str] = Field(default_factory=list)
     misconceptions: list[str] = Field(default_factory=list)
     contradictions: list[str] = Field(default_factory=list)

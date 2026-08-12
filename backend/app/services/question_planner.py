@@ -112,7 +112,7 @@ class QuestionPlanner:
         questions: list[Question],
     ) -> QuestionPlanSlot | None:
         """Plan a coaching follow-up for a partial/weak answer, or None."""
-        if dims.answer_status in {"irrelevant", "knowledge_gap", "nonsense"}:
+        if dims.answer_status in {"irrelevant", "knowledge_gap", "keyword_stuffing", "question_repetition", "nonsensical", "insufficient_evidence"}:
             # These states are coaching moments, not follow-up moments.
             return None
         if _is_strong(dims):
@@ -223,7 +223,7 @@ class QuestionPlanner:
 def _is_strong(dims: EvaluationDimensions) -> bool:
     """A strong answer needs no follow-up: correct, complete and on topic."""
     return (
-        dims.answer_status in {"on_topic", "partial"}
+        dims.answer_status in {"strong", "partial", "incomplete"}
         and dims.correctness_score >= 7
         and dims.completeness_score >= 7
         and not dims.missing_requirements

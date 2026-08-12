@@ -50,10 +50,13 @@ class Settings(BaseSettings):
     score_weight_reasoning: float = 0.1
 
     # Hard gates: an answer in one of these states can never score above the cap.
-    # These make the "score is not the source of truth" rule explicit.
+    # These make the "score is not the source of truth" rule explicit. Non-answer
+    # states (repetition, stuffing, gibberish) are capped at ~1; an honest
+    # "I don't know" scores 0; irrelevance caps at 2.
     status_score_caps: str = (
-        "on_topic:10,partial:7,incorrect:4.5,irrelevant:2,knowledge_gap:1.5,"
-        "contradictory:4,nonsense:1,echo:1.5"
+        "strong:10,partial:7,incomplete:6,incorrect:4.5,irrelevant:2,"
+        "knowledge_gap:0,contradictory:4,keyword_stuffing:1,"
+        "question_repetition:1,nonsensical:1,insufficient_evidence:2"
     )
 
     model_config = SettingsConfigDict(

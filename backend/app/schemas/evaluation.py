@@ -9,7 +9,7 @@ class EvaluationOut(BaseModel):
     id: int
     answer_id: int
     score: float
-    answer_status: str = "on_topic"
+    answer_status: str = "strong"
     relevance_score: float = 0
     understanding_score: float = 0
     correctness_score: float = 0
@@ -18,6 +18,8 @@ class EvaluationOut(BaseModel):
     satisfied_requirements: list[str] = Field(default_factory=list)
     partial_requirements: list[str] = Field(default_factory=list)
     missing_requirements: list[str] = Field(default_factory=list)
+    mentioned_concepts: list[str] | None = Field(default_factory=list)
+    demonstrated_concepts: list[str] | None = Field(default_factory=list)
     technical_errors: list[str] = Field(default_factory=list)
     misconceptions: list[str] = Field(default_factory=list)
     contradictions: list[str] = Field(default_factory=list)

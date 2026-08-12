@@ -102,8 +102,39 @@ Read this after the README to understand *why*, not just *what*.
 - `_is_echo` flags an answer when it re-uses the question's content words in order (or verbatim) while adding almost no new content (`new_ratio ≤ 0.25`). Directive verbs ("explain") are excluded from the question's content words so a trailing "please explain" doesn't defeat it, and answers that add real substance (a full explanation after the paste, or a concise-but-added point) are protected from false flags by the same new-content requirement.
 - Echo gets a hard gate (`echo:1.5`) and its own coaching message in the feedback panel, matching how `nonsense` and `knowledge_gap` are treated.
 
+## Why evaluation is now a staged pipeline, not a score formula
+- The original evaluator computed relevance → correctness → a weighted score. The pasted-question bug survived that shape because *everything* (relevance, understanding, strengths) was derived from the same topic-vocabulary overlap — an echo of the question maximized it all. No score formula or prompt tweak fixes a structural hole, so the evaluator was rebuilt as a mandatory **Answer Validation** stage that runs *first* and decides status before any credit is computed:
+
+  ```
+  validation (gates)  →  relevance  →  understanding  →  correctness  →  question-type  →  status/dimensions
+  ```
+
+- The validation stage owns five hard gates, each backed by unit + benchmark cases:
+  - **question_repetition** — the question echoed verbatim or lightly paraphrased with ≤ 40% new content (`_is_repetition`, containment/similarity/new-ratio checks against the *question + optional depth points only*). Key insight: expected concepts and core requirements are what a correct answer *must* contain, so reproducing their vocabulary is legitimate answering; only the question itself (and optional follow-up depth points) can be "repeated". Keyword-list copies of the rubric are caught by the stuffing gate instead.
+  - **keyword_stuffing** — a short, dense list of rubric keywords with a low prose-to-term ratio, scored on *raw typed* domain tokens so a single legit term like "dictionary" can't inflate itself into a stuffing case.
+  - **nonsensical** — long non-words / greeked text.
+  - **insufficient_evidence** — on-topic mention-only answers shorter than 4 evidence words (e.g. "dictionary").
+  - **irrelevant** — topic density below the relevance threshold.
+
+- **Question type controls evaluation.** Coding questions require code *or* an implementation plan (`_question_type_satisfied`); explanation/comparison/debugging/scenario/system-design questions require their own evidence (comparisons need ≥ 2 expected concepts engaged with ≥ 12 words, even without marker words). This is why "definitions only" to a *coding* question is `incomplete` (demonstrated = []) rather than partial credit.
+- **Mention ≠ understanding.** Every stage now distinguishes `mentioned_concepts` from `demonstrated_concepts`; strengths are built *only* from demonstrated concepts, so a candidate can never earn credit just for naming a topic.
+- **Similarity is never scored as correctness.** High similarity to the question now means *repetition* (a hard 1-point cap), never credit.
+- Statuses carry deterministic score caps (`status_score_caps`): `question_repetition:1`, `keyword_stuffing:1`, `insufficient_evidence:2`, `irrelevant:2`, `incomplete:6`, `partial:7`, `strong:10`, etc. Gates are non-negotiable — a gated status can never be overridden by a high similarity/completeness score.
+
 ## Why the scoring dimensions are surfaced verbatim in the UI
 - Coaching-first feedback (demonstrated / partial / missing / corrections, with the score demoted to a badge) is what a candidate can actually act on. The structured fields are returned by the API (`AnswerSubmissionResponse`) and rendered directly, so the frontend never re-derives what the evaluator concluded.
+
+---
+
+## Part 50.5 — Answer-Validation Refactor (the pasted-question bug)
+
+**Goal achieved:** pasted/paraphrased questions, keyword mentions, and question-type-inappropriate answers can *never* earn credit again, at the architecture level.
+
+**Root cause.** The mock evaluator built its topic vocabulary from `question + expected_concepts + core_requirements`. Pasting the question therefore produced 100% topic-vocabulary overlap → relevance ≈ 10 → `partial` ≈ 6.2 credit; there was no validation stage, mentioning a concept scored it as demonstrated, question type was ignored, and strengths were minted from mere mentions.
+
+**Fix.** A mandatory validation stage first (`_validate_answer`), 11 statuses (was 4), the `mentioned` vs `demonstrated` concept split (persisted via migration `f04063a038bb`), per-question-type evidence requirements, and status score caps that gates can never be outvoted past. Full detail in "Why evaluation is now a staged pipeline" above.
+
+**Verification.** 90 pytest tests (incl. 10 new `test_answer_validation.py` acceptance tests and rewritten behavior tests) + a 46-case behavioral benchmark all pass; `ruff check app tests` clean. The 10 acceptance scenarios (paste → repetition, light paraphrase → repetition, keyword list → stuffing, single word → insufficient evidence, short complete comparison → strong, bread sentence → irrelevant, wrong-but-grammatical → incorrect, synonymous terminology → strong, partial-with-gap → partial, definitions-only to coding → incomplete) are pinned both in the benchmark and as pytest tests.
 
 ---
 

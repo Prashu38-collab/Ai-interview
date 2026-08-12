@@ -123,7 +123,7 @@ def answer_evaluation_prompt(
         "score — the application computes that from your dimensions."
     )
     schema = """{
-  "answer_status": "on_topic | partial | incorrect | irrelevant | knowledge_gap | contradictory | nonsense",
+  "answer_status": "strong | partial | incomplete | incorrect | irrelevant | knowledge_gap | contradictory | keyword_stuffing | question_repetition | nonsensical | insufficient_evidence",
   "relevance_score": 0,
   "understanding_score": 0,
   "correctness_score": 0,

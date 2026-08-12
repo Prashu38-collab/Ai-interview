@@ -7,15 +7,25 @@
     "partial": "answers covering part of the rubric -> partial, 2 <= score < 7",
     "incorrect": "answers stating a known misconception -> capped at 4.5",
     "irrelevant": "off-topic answers (even if technical) -> capped at 2.5",
-    "keyword_stuffing": "dense vocabulary with no structure -> nonsense, capped at 1.5",
+    "keyword_stuffing": "dense vocabulary with no structure -> keyword_stuffing, capped at 1.5",
     "verbose_irrelevant": "long padded answers -> stay low",
     "contradictory": "self-contradictory answers -> capped at 4",
     "unknown": "honest 'I don't know' -> knowledge_gap, capped at 2",
-    "echo": "repeating the question back -> echo, capped at 1.5",
+    "question_repetition": "repeating the question back -> question_repetition, capped at 1.5",
     "scenario": "good answer to a scenario question",
     "debugging": "good answer to a debugging question",
     "coding": "good answer to a coding question",
-    "system_design": "good answer to a system design question"
+    "system_design": "good answer to a system design question",
+    "accept_repeat": "pasted question verbatim -> question_repetition, score <= 1",
+    "accept_paraphrase": "light paraphrase of the question, no new info -> question_repetition, score <= 1",
+    "accept_stuffing": "keywords copied from the question -> keyword_stuffing, score <= 1",
+    "accept_fragment": "a single concept word -> insufficient_evidence, score <= 2",
+    "accept_short_strong": "short but complete comparison -> strong",
+    "accept_irrelevant": "off-topic but grammatical -> irrelevant, score <= 2",
+    "accept_wrong": "grammatically perfect but technically wrong -> incorrect",
+    "accept_synonym": "same correct answer in different terminology -> strong",
+    "accept_partial": "partially correct with a clear gap -> partial",
+    "accept_qtype": "coding question answered with definitions only -> incomplete, not strong"
   },
   "cases": [
     {
@@ -235,8 +245,8 @@
       "answer": "I'm not sure, we haven't covered query plans in my course."
     },
     {
-      "id": "echo-decorators-verbatim",
-      "category": "echo",
+      "id": "question-repetition-decorators-verbatim",
+      "category": "question_repetition",
       "skill": "Python",
       "concept": "decorators",
       "question_type": "explanation",
@@ -244,8 +254,8 @@
       "answer": "Explain how a Python decorator wraps a function to extend its behaviour."
     },
     {
-      "id": "echo-indexes-reworded",
-      "category": "echo",
+      "id": "question-repetition-indexes-reworded",
+      "category": "question_repetition",
       "skill": "PostgreSQL",
       "concept": "indexes",
       "question_type": "explanation",
@@ -318,6 +328,126 @@
       "concept": "caching",
       "question_type": "system_design",
       "answer": "Use cache-aside or write-through, set a TTL, and plan invalidation so stale data is bounded. The main risk is a cache stampede when many clients miss at once."
+    },
+    {
+      "id": "accept-repeat-verbatim",
+      "category": "accept_repeat",
+      "skill": "Python",
+      "concept": "data structures",
+      "question_type": "coding",
+      "question_text": "Write a short snippet using data structures in Python. What are the key design decisions?",
+      "expected_concepts": ["lists and tuples", "sets and dictionaries"],
+      "core_requirements": ["list vs tuple vs set vs dict", "time complexity of common operations", "choosing the right structure for the problem"],
+      "common_misconceptions": ["dict keys can be any object", "sets preserve insertion order"],
+      "answer": "Write a short snippet using data structures in Python. What are the key design decisions?"
+    },
+    {
+      "id": "accept-paraphrase-light",
+      "category": "accept_paraphrase",
+      "skill": "Python",
+      "concept": "data structures",
+      "question_type": "coding",
+      "question_text": "Write a short snippet using data structures in Python. What are the key design decisions?",
+      "expected_concepts": ["lists and tuples", "sets and dictionaries"],
+      "core_requirements": ["list vs tuple vs set vs dict", "time complexity of common operations", "choosing the right structure for the problem"],
+      "common_misconceptions": ["dict keys can be any object", "sets preserve insertion order"],
+      "answer": "So you want to write a short snippet using data structures in the Python programming language and then talk about the key design decisions you would make."
+    },
+    {
+      "id": "accept-stuffing-keywords",
+      "category": "accept_stuffing",
+      "skill": "Python",
+      "concept": "data structures",
+      "question_type": "coding",
+      "question_text": "Write a short snippet using data structures in Python. What are the key design decisions?",
+      "expected_concepts": ["lists and tuples", "sets and dictionaries"],
+      "core_requirements": ["list vs tuple vs set vs dict", "time complexity of common operations", "choosing the right structure for the problem"],
+      "common_misconceptions": ["dict keys can be any object", "sets preserve insertion order"],
+      "answer": "list tuple set dict time complexity indexing hashing iteration ordered mutable immutable"
+    },
+    {
+      "id": "accept-fragment-single-word",
+      "category": "accept_fragment",
+      "skill": "Python",
+      "concept": "data structures",
+      "question_type": "coding",
+      "question_text": "Write a short snippet using data structures in Python. What are the key design decisions?",
+      "expected_concepts": ["lists and tuples", "sets and dictionaries"],
+      "core_requirements": ["list vs tuple vs set vs dict", "time complexity of common operations", "choosing the right structure for the problem"],
+      "common_misconceptions": ["dict keys can be any object", "sets preserve insertion order"],
+      "answer": "dictionary"
+    },
+    {
+      "id": "accept-short-complete-comparison",
+      "category": "accept_short_strong",
+      "skill": "Python",
+      "concept": "data structures",
+      "question_type": "comparison",
+      "question_text": "Compare lists, tuples and sets in Python. When would you pick each one?",
+      "expected_concepts": ["lists and tuples", "sets and dictionaries"],
+      "core_requirements": ["list vs tuple vs set vs dict", "time complexity of common operations", "choosing the right structure for the problem"],
+      "common_misconceptions": ["dict keys can be any object", "sets preserve insertion order"],
+      "answer": "Lists are ordered and mutable, tuples are ordered but immutable, sets are unordered and unique. Pick a list for ordered data you change, a tuple for fixed data, a set for O(1) membership checks. The key is choosing the right structure for the operation."
+    },
+    {
+      "id": "accept-irrelevant-grammatical",
+      "category": "accept_irrelevant",
+      "skill": "Python",
+      "concept": "data structures",
+      "question_type": "coding",
+      "question_text": "Write a short snippet using data structures in Python. What are the key design decisions?",
+      "expected_concepts": ["lists and tuples", "sets and dictionaries"],
+      "core_requirements": ["list vs tuple vs set vs dict", "time complexity of common operations", "choosing the right structure for the problem"],
+      "common_misconceptions": ["dict keys can be any object", "sets preserve insertion order"],
+      "answer": "The best bread for breakfast is sourdough because of its crust."
+    },
+    {
+      "id": "accept-wrong-grammatical",
+      "category": "accept_wrong",
+      "skill": "Python",
+      "concept": "data structures",
+      "question_type": "coding",
+      "question_text": "Write a short snippet using data structures in Python. What are the key design decisions?",
+      "expected_concepts": ["lists and tuples", "sets and dictionaries"],
+      "core_requirements": ["list vs tuple vs set vs dict", "time complexity of common operations", "choosing the right structure for the problem"],
+      "common_misconceptions": ["dict keys can be any object", "sets preserve insertion order"],
+      "answer": "Sets preserve insertion order in Python, so you can rely on iteration matching the order items were added."
+    },
+    {
+      "id": "accept-synonym-terminology",
+      "category": "accept_synonym",
+      "skill": "Python",
+      "concept": "data structures",
+      "question_type": "coding",
+      "question_text": "Write a short snippet using data structures in Python. What are the key design decisions?",
+      "expected_concepts": ["lists and tuples", "sets and dictionaries"],
+      "core_requirements": ["list vs tuple vs set vs dict", "time complexity of common operations", "choosing the right structure for the problem"],
+      "common_misconceptions": ["dict keys can be any object", "sets preserve insertion order"],
+      "answer": "The key design decisions: an ordered resizable sequence for positional access, a hash map for fast key lookups, a hash set for uniqueness and membership tests. Choosing the right container for the problem is the whole point; hashed structures give constant-time average access, and the operations you need determine the choice."
+    },
+    {
+      "id": "accept-partial-gap-identified",
+      "category": "accept_partial",
+      "skill": "Python",
+      "concept": "data structures",
+      "question_type": "coding",
+      "question_text": "Write a short snippet using data structures in Python. What are the key design decisions?",
+      "expected_concepts": ["lists and tuples", "sets and dictionaries"],
+      "core_requirements": ["list vs tuple vs set vs dict", "time complexity of common operations", "choosing the right structure for the problem"],
+      "common_misconceptions": ["dict keys can be any object", "sets preserve insertion order"],
+      "answer": "I would use a set built from the names to remove duplicates, then a dict to count occurrences. That is a fast approach."
+    },
+    {
+      "id": "accept-qtype-definitions-only",
+      "category": "accept_qtype",
+      "skill": "Python",
+      "concept": "data structures",
+      "question_type": "coding",
+      "question_text": "Write a short snippet using data structures in Python. What are the key design decisions?",
+      "expected_concepts": ["lists and tuples", "sets and dictionaries"],
+      "core_requirements": ["list vs tuple vs set vs dict", "time complexity of common operations", "choosing the right structure for the problem"],
+      "common_misconceptions": ["dict keys can be any object", "sets preserve insertion order"],
+      "answer": "Data structures in Python are things like lists, tuples, sets and dicts. They store collections of items."
     }
   ]
 }

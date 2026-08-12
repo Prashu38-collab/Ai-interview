@@ -128,8 +128,9 @@ def test_mock_evaluation_returns_validated_model():
     )
     assert 0 <= dims.relevance_score <= 10
     assert dims.answer_status in {
-        "on_topic", "partial", "incorrect", "irrelevant", "knowledge_gap",
-        "contradictory", "nonsense",
+        "strong", "partial", "incomplete", "incorrect", "irrelevant",
+        "knowledge_gap", "contradictory", "keyword_stuffing",
+        "question_repetition", "nonsensical", "insufficient_evidence",
     }
     assert isinstance(dims.satisfied_requirements, list)
     assert isinstance(dims.strengths, list)

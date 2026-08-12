@@ -42,18 +42,18 @@ def test_concise_correct_answer_gets_full_credit():
         "A decorator is a function that takes another function and returns a "
         "wrapper that adds behaviour before and after the call.",
     )
-    assert dims.answer_status == "on_topic"
+    assert dims.answer_status == "strong"
     assert not dims.missing_requirements
     assert score >= 7.0
 
 
-def test_keyword_stuffing_is_nonsense():
+def test_keyword_stuffing_is_capped():
     ai = MockAIService()
     dims, score = _evaluate(
         ai,
         "decorator wrapper functools wraps callable metaclass generator async closure lambda",
     )
-    assert dims.answer_status == "nonsense"
+    assert dims.answer_status == "keyword_stuffing"
     assert score <= 1.5
 
 
@@ -95,7 +95,7 @@ def test_alternative_valid_phrasing_scores_well():
         "you run setup or teardown logic around the original function, for "
         "example timing, logging or auth checks.",
     )
-    assert dims.answer_status == "on_topic"
+    assert dims.answer_status == "strong"
     assert not dims.missing_requirements
     assert score >= 7.0
 
@@ -194,26 +194,28 @@ def test_strong_answer_produces_no_follow_up(client, auth_headers, make_intervie
     assert body["follow_up"] is None
 
 
-def test_pasting_the_question_is_an_echo_not_an_answer():
+def test_pasting_the_question_is_a_repetition_not_an_answer():
     ai = MockAIService()
     question = "Explain how a Python decorator works."
     dims, score = _evaluate(ai, question)
-    assert dims.answer_status == "echo"
-    assert score <= 1.5
+    assert dims.answer_status == "question_repetition"
+    assert score <= 1.0
     assert not dims.satisfied_requirements
+    assert not dims.demonstrated_concepts
+    assert not dims.strengths
 
 
-def test_reworded_echo_is_still_flagged():
+def test_reworded_question_is_still_flagged_as_repetition():
     ai = MockAIService()
     dims, score = _evaluate(
         ai,
-        "Explain how a Python decorator works, please.",
+        "So you want an explanation of how a Python decorator works, please.",
     )
-    assert dims.answer_status == "echo"
-    assert score <= 1.5
+    assert dims.answer_status == "question_repetition"
+    assert score <= 1.0
 
 
-def test_echo_with_a_real_explanation_is_not_flagged():
+def test_question_echo_with_a_real_explanation_is_not_flagged():
     ai = MockAIService()
     dims, score = _evaluate(
         ai,
@@ -221,5 +223,5 @@ def test_echo_with_a_real_explanation_is_not_flagged():
         "takes another function and returns a wrapper that adds behaviour "
         "before and after the call.",
     )
-    assert dims.answer_status == "on_topic"
+    assert dims.answer_status == "strong"
     assert score >= 7.0

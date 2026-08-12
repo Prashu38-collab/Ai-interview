@@ -177,12 +177,65 @@ SYNONYM_GROUPS: tuple[frozenset[str], ...] = (
                "retrieves", "search", "searches"}),
     frozenset({"thread", "threads", "process", "processes", "concurrent",
                "concurrency", "parallel", "parallelism"}),
+    # Data-structure synonyms: a correct answer that says "hash map" instead of
+    # "dict" or "sequence" instead of "list" must still match the rubric. The
+    # mock evaluator deliberately avoids keyword-count credit, so these exist
+    # to prevent *under*credit for synonymous terminology.
+    frozenset({"list", "lists", "sequence", "sequences", "array", "arrays"}),
+    frozenset({"dict", "dictionary", "dictionaries", "hash", "hashes",
+               "hashing", "map", "maps", "mapping", "mappings", "associative"}),
+    frozenset({"set", "sets", "hashset", "hashsets"}),
+    frozenset({"lookup", "lookups", "membership", "member", "members"}),
+    frozenset({"explain", "explains", "explained", "explaining", "explanation",
+               "explanations", "describe", "describes", "described",
+               "describing", "description", "descriptions"}),
 )
 
 # Thresholds
 STUFFING_TECH_RATIO = 0.6
 STUFFING_MAX_WORDS = 14
 IRRELEVANT_RELEVANCE = 0.5
+# The minimum answer length that can carry explanatory evidence. Shorter
+# answers are treated as mention-only fragments ("Python decorator."). A
+# short grammatical claim ("A decorator modifies a function.") is evidence.
+MIN_EVIDENCE_WORDS = 4
+MIN_EVIDENCE_PROSE_RATIO = 0.15
+# A "real answer" to a coding question that contains no code must still show an
+# implementation approach; anything shorter is treated as concept-only.
+MIN_CODING_EXPLANATION_WORDS = 15
+# Repetition: the answer may not add more than this share of novel content
+# beyond the question + rubric before we stop calling it a copy.
+MAX_REPETITION_NEW_RATIO = 0.4
+REPETITION_CONTAINMENT = 0.9
+REPETITION_SIMILARITY = 0.72
+# The re-worded-repetition branch only fires when the answer is close in length
+# to the text it is restating; padding a copy with filler still gets caught up
+# to this multiple (the new_ratio + explanation-marker guards bound the risk).
+REPETITION_MAX_LENGTH_MULTIPLE = 2.5
+
+# Words/phrases a genuine answer uses when it moves past echoing the prompt.
+# A light paraphrase of the question never needs them; a real answer almost
+# always does. Their presence protects real answers that reuse the rubric's
+# own vocabulary.
+REPETITION_EXPLANATION_MARKERS = {
+    "because", "example", "for example", "for instance", "such as", "means",
+    "meaning", "which", "when", "if", "so that", "in practice", "in other words",
+    "that is", "however", "instead", "but",
+}
+
+# A coding question needs code or an implementation approach. These words show
+# the candidate actually planned the implementation rather than just defining
+# the topic (e.g. "Data structures are things like lists..." has none of them).
+CODING_IMPLICATION_MARKERS = {
+    "write", "writes", "writing", "written", "wrote", "code", "codes", "coding",
+    "function", "functions", "snippet", "algorithm", "algorithms", "implement",
+    "implementation", "implementing", "build", "builds", "building", "built",
+    "loop", "loops", "looping", "iterate", "iterates", "iterating", "iteration",
+    "return", "returns", "returned", "program", "programs", "procedure",
+    "step", "steps", "choose", "chooses", "choosing", "chosen", "pick",
+    "picks", "picked", "use", "uses", "using", "used", "would", "approach",
+    "approaches", "decision", "decisions", "then",
+}
 
 
 def _scan_skills(text: str) -> list[str]:
@@ -275,6 +328,19 @@ class MockAIService(AIService):
 
     # ------------------------------------------------------------------
     # Answer evaluation (structured, heuristic)
+    #
+    # Pipeline (each stage is a hard gate on the next):
+    #   Candidate Answer
+    #     -> 1. Answer Validation   (repetition / stuffing / gibberish /
+    #                                knowledge gap / mention-only fragments)
+    #     -> 2. Relevance Validation (off-topic answers stop here)
+    #     -> 3. Understanding Assessment (evidence-based requirement coverage)
+    #     -> 4. Technical Correctness   (misconceptions / contradictions)
+    #     -> 5. Question-Type Requirement (e.g. coding answers must show code)
+    #     -> 6. Status + Feedback + Score (ScoreEngine applies hard gates)
+    #
+    # Mention is never understanding: a concept only counts as demonstrated when
+    # the answer provides evidence (an explanation, code, comparison, ...).
     # ------------------------------------------------------------------
     def evaluate_answer(
         self,
@@ -291,58 +357,25 @@ class MockAIService(AIService):
         common_misconceptions: list[str],
         answer_text: str,
     ) -> EvaluationDimensions:
+        answer_text = _normalize_complexity(answer_text)
         words = re.findall(r"[a-z']+", answer_text.lower())
         distinct = set(words)
         word_count = len(words)
+        qtype = normalize_type(question_type)
+        concept_name = concept or skill
+        # Repetition is judged against the QUESTION and optional depth points
+        # only. Expected concepts and core requirements describe what a correct
+        # answer MUST contain, so reproducing their vocabulary is legitimate
+        # answering, not an echo (keyword-list copies are caught separately by
+        # the keyword-stuffing gate).
+        given_texts = [question_text] + list(optional_depth_points)
 
-        # --- I don't know ---------------------------------------------------
-        if _is_knowledge_gap(answer_text):
-            return EvaluationDimensions(
-                answer_status="knowledge_gap",
-                relevance_score=0.5,
-                understanding_score=0,
-                correctness_score=0,
-                completeness_score=0,
-                reasoning_score=0,
-                missing_requirements=list(core_requirements),
-                recommended_topics=[concept or skill],
-                confidence=0.9,
-                strengths=["Was honest about not knowing."],
-            )
-
-        # --- echo: repeating the question is not an answer ------------------
-        # Pasting the question back is made of the question's own topic
-        # vocabulary, so without this guard it looks fully on-topic and scores
-        # mid-range despite containing no answer at all.
-        if _is_echo(question_text, answer_text, words):
-            return EvaluationDimensions(
-                answer_status="echo",
-                relevance_score=2.0,
-                understanding_score=0.5,
-                correctness_score=0.5,
-                completeness_score=0,
-                reasoning_score=0,
-                missing_requirements=list(core_requirements),
-                recommended_topics=[concept or skill],
-                confidence=0.9,
-                strengths=[],
-            )
-
-        # --- topic vocabulary ------------------------------------------------
-        topic_words: set[str] = set()
-        for phrase in [skill, concept or "", question_text] + expected_concepts + core_requirements:
-            topic_words.update(_content_words(phrase))
-        topic_vocab = _expand_terms(topic_words)
-        relevant_vocab = _expand_terms(set(TECH_TERMS)) | topic_vocab
-
-        # An answer is on-topic when it engages THIS question's concept words,
-        # not just any technical vocabulary ("indexes/transactions" don't answer
-        # a decorator question). Generic tech words still contribute, but with
-        # half the weight. Both sides are synonym/inflection-expanded, so
-        # "begins" counts for a rubric that says "begin".
+        # Feature extraction (cheap; used by validation and knowledge stages).
+        topic_vocab, relevant_vocab = _topic_vocabulary(
+            skill, concept, question_text, expected_concepts, core_requirements
+        )
         expanded_present = _expand_terms(distinct)
         topic_hits = expanded_present & topic_vocab
-        relevant_vocab = _expand_terms(set(TECH_TERMS)) | topic_vocab
         tech_hits = (expanded_present & relevant_vocab) - topic_hits
         noise = {
             w
@@ -361,35 +394,51 @@ class MockAIService(AIService):
             else 0.0
         )
 
-        # --- keyword stuffing / nonsense ------------------------------------
-        # A dense burst of domain words with no connecting language is not an
-        # answer. Domain words = glossary OR this question's own vocabulary.
-        domain_terms = {w for w in distinct if w in TECH_TERMS or w in topic_vocab}
-        glue = {w for w in distinct if w in STOPWORDS}
-        stuffing = (
-            len(domain_terms) >= 4
-            and len(glue) == 0
-            and word_count <= STUFFING_MAX_WORDS
-            and len(domain_terms) / max(word_count, 1) >= STUFFING_TECH_RATIO
+        # ================= STAGE 1: ANSWER VALIDATION =================
+        # Raw tokens that belong to the topic: used by the keyword-stuffing
+        # gate, which must count what was actually typed (a single "dictionary"
+        # must not look like ten keywords via synonym expansion).
+        raw_domain_hits = {
+            w for w in distinct if not _word_group(w).isdisjoint(relevant_vocab)
+        }
+        non_answer = self._validate_answer(
+            answer_text=answer_text,
+            words=words,
+            word_count=word_count,
+            domain_terms=raw_domain_hits,
+            topic_hits=topic_hits,
+            relevance_ratio=relevance_ratio,
+            given_texts=given_texts,
+            core_requirements=core_requirements,
+            concept=concept_name,
         )
-        if stuffing:
+        if non_answer is not None:
+            return non_answer
+
+        # ============ STAGE 2: RELEVANCE VALIDATION ============
+        if not topic_hits and noise:
             return EvaluationDimensions(
-                answer_status="nonsense",
-                relevance_score=3.0,
-                understanding_score=0.5,
-                correctness_score=0.5,
+                answer_status="irrelevant",
+                relevance_score=round(10 * relevance_ratio, 1),
+                understanding_score=round(10 * relevance_ratio, 1),
+                correctness_score=2.0,
                 completeness_score=0,
-                reasoning_score=0,
+                reasoning_score=round(5 * relevance_ratio, 1),
                 missing_requirements=list(core_requirements),
-                recommended_topics=[concept or skill],
-                confidence=0.9,
+                recommended_topics=[concept_name],
+                confidence=0.85,
                 strengths=[],
             )
 
-        # --- rubric requirement matching ------------------------------------
+        # ========== STAGE 3: UNDERSTANDING ASSESSMENT ==========
+        # Requirements are only satisfied by answers with evidence. Merely
+        # printing a rubric keyword is never enough (keyword_count is not a
+        # correctness signal).
+        evidence = _has_evidence(words, distinct, word_count)
         satisfied, partial, missing = _requirements_state(
             core_requirements,
             words,
+            evidence=evidence,
             topic_hits=topic_hits,
             noise=noise,
             word_count=word_count,
@@ -397,12 +446,16 @@ class MockAIService(AIService):
         total = len(core_requirements) or 1
         coverage = (len(satisfied) + 0.5 * len(partial)) / total
 
-        # --- misconceptions & contradictions --------------------------------
-        # Checked BEFORE the relevance gate: an answer that states a known
-        # misconception or contradicts itself is a stronger signal than its
-        # token-level relevance ratio.
+        # ============ STAGE 4: TECHNICAL CORRECTNESS ============
+        # Checked BEFORE the relevance gate: stating a known misconception or
+        # contradicting yourself is a stronger signal than token relevance.
         misconceptions = _detect_misconceptions(common_misconceptions, answer_text)
         contradictions = _detect_contradictions(answer_text)
+
+        mentioned, demonstrated = _concept_status(
+            expected_concepts, words, satisfied=satisfied, evidence=evidence
+        )
+
         if contradictions:
             return self._dims_for(
                 status="contradictory",
@@ -413,9 +466,11 @@ class MockAIService(AIService):
                 satisfied=satisfied,
                 partial=partial,
                 missing=missing,
-                concept=concept or skill,
+                mentioned=mentioned,
+                demonstrated=demonstrated,
+                concept=concept_name,
                 skill=skill,
-                question_type=normalize_type(question_type),
+                question_type=qtype,
                 contradictions=contradictions,
                 technical_errors=misconceptions,
             )
@@ -429,29 +484,31 @@ class MockAIService(AIService):
                 satisfied=satisfied,
                 partial=partial,
                 missing=missing,
-                concept=concept or skill,
+                mentioned=mentioned,
+                demonstrated=demonstrated,
+                concept=concept_name,
                 skill=skill,
-                question_type=normalize_type(question_type),
+                question_type=qtype,
                 technical_errors=misconceptions,
             )
 
-        # --- relevance gate -------------------------------------------------
-        if not topic_hits and noise:
-            return EvaluationDimensions(
-                answer_status="irrelevant",
-                relevance_score=round(10 * relevance_ratio, 1),
-                understanding_score=round(10 * relevance_ratio, 1),
-                correctness_score=2.0,
-                completeness_score=0,
-                reasoning_score=round(5 * relevance_ratio, 1),
-                missing_requirements=list(core_requirements),
-                recommended_topics=[concept or skill],
-                confidence=0.85,
-                strengths=[],
-            )
+        # ========== STAGE 5: QUESTION-TYPE REQUIREMENT ==========
+        # A coding question is not answered by defining a dictionary; a
+        # comparison question needs an actual comparison, etc.
+        qtype_ok = _question_type_satisfied(
+            qtype, answer_text, words, word_count, expected_concepts
+        )
+        if not qtype_ok:
+            status = "incomplete"
+            demonstrated = []
+        elif coverage >= 0.8:
+            status = "strong"
+        elif evidence:
+            status = "partial"
+        else:
+            status = "insufficient_evidence"
+            demonstrated = []
 
-        # --- partial vs on-topic --------------------------------------------
-        status = "on_topic" if coverage >= 0.8 else "partial"
         return self._dims_for(
             status=status,
             relevance_ratio=relevance_ratio,
@@ -461,10 +518,105 @@ class MockAIService(AIService):
             satisfied=satisfied,
             partial=partial,
             missing=missing,
-            concept=concept or skill,
+            mentioned=mentioned,
+            demonstrated=demonstrated,
+            concept=concept_name,
             skill=skill,
-            question_type=normalize_type(question_type),
+            question_type=qtype,
         )
+
+    # ------------------------------------------------------------------
+    # Stage 1: Answer validation (non-answer gate)
+    # ------------------------------------------------------------------
+    def _validate_answer(
+        self,
+        *,
+        answer_text: str,
+        words: list[str],
+        word_count: int,
+        domain_terms: set[str],
+        topic_hits: set[str],
+        relevance_ratio: float,
+        given_texts: list[str],
+        core_requirements: list[str],
+        concept: str,
+    ) -> EvaluationDimensions | None:
+        """Return gated dimensions when the answer is a non-answer, else None."""
+        missing = list(core_requirements)
+
+        if _is_knowledge_gap(answer_text):
+            return EvaluationDimensions(
+                answer_status="knowledge_gap",
+                relevance_score=0.5,
+                understanding_score=0,
+                correctness_score=0,
+                completeness_score=0,
+                reasoning_score=0,
+                missing_requirements=missing,
+                recommended_topics=[concept],
+                confidence=0.9,
+                strengths=["Was honest about not knowing."],
+            )
+
+        if not _content_words(answer_text):
+            return EvaluationDimensions(
+                answer_status="nonsensical",
+                relevance_score=0,
+                understanding_score=0,
+                correctness_score=0,
+                completeness_score=0,
+                reasoning_score=0,
+                missing_requirements=missing,
+                recommended_topics=[concept],
+                confidence=0.9,
+                strengths=[],
+            )
+
+        if _is_repetition(given_texts, answer_text, words):
+            return EvaluationDimensions(
+                answer_status="question_repetition",
+                relevance_score=2.0,
+                understanding_score=0,
+                correctness_score=0,
+                completeness_score=0,
+                reasoning_score=0,
+                missing_requirements=missing,
+                recommended_topics=[concept],
+                confidence=0.95,
+                strengths=[],
+            )
+
+        if _is_keyword_stuffing(domain_terms, words, word_count):
+            return EvaluationDimensions(
+                answer_status="keyword_stuffing",
+                relevance_score=3.0,
+                understanding_score=0.5,
+                correctness_score=0.5,
+                completeness_score=0,
+                reasoning_score=0,
+                missing_requirements=missing,
+                recommended_topics=[concept],
+                confidence=0.9,
+                strengths=[],
+            )
+
+        if topic_hits and word_count < MIN_EVIDENCE_WORDS:
+            # A fragment like "Python decorator." or "dictionary." mentions the
+            # concept but demonstrates nothing.
+            return EvaluationDimensions(
+                answer_status="insufficient_evidence",
+                relevance_score=round(10 * relevance_ratio, 1),
+                understanding_score=0,
+                correctness_score=0,
+                completeness_score=0,
+                reasoning_score=0,
+                missing_requirements=missing,
+                recommended_topics=[concept],
+                confidence=0.85,
+                strengths=[],
+            )
+
+        return None
 
     # ------------------------------------------------------------------
     def _dims_for(
@@ -477,6 +629,8 @@ class MockAIService(AIService):
         satisfied: list[str],
         partial: list[str],
         missing: list[str],
+        mentioned: list[str],
+        demonstrated: list[str],
         concept: str,
         skill: str,
         question_type: str,
@@ -506,9 +660,11 @@ class MockAIService(AIService):
         gap = _pick_gap(missing, partial, concept)
         follow_up, follow_up_concept = self._follow_up(question_type, gap, status, concept)
 
+        # Strengths must reflect DEMONSTRATED understanding. A concept that was
+        # merely mentioned is never a strength.
         strengths = []
         if satisfied:
-            strengths.append(f"Mentioned key concepts: {', '.join(satisfied[:3])}.")
+            strengths.append(f"Demonstrated: {', '.join(satisfied[:3])}.")
         elif relevance_ratio >= 0.7:
             strengths.append("Stayed on topic and used relevant technical terms.")
 
@@ -522,6 +678,8 @@ class MockAIService(AIService):
             satisfied_requirements=satisfied,
             partial_requirements=partial,
             missing_requirements=missing,
+            mentioned_concepts=mentioned,
+            demonstrated_concepts=demonstrated,
             technical_errors=technical_errors or [],
             misconceptions=technical_errors or [],
             contradictions=contradictions or [],
@@ -536,10 +694,8 @@ class MockAIService(AIService):
     def _follow_up(
         question_type: str, gap: str, status: str, concept: str
     ) -> tuple[str, str]:
-        if status not in {"partial", "on_topic"} or not gap:
+        if status not in {"partial", "incomplete"} or not gap:
             return "", ""
-        if status == "on_topic":
-            return "", ""  # strong answers get no follow-up
         starter = FOLLOWUP_STARTERS.get(normalize_type(question_type), FOLLOWUP_STARTERS["explanation"])
         return starter.format(topic=gap), concept
 
@@ -589,39 +745,116 @@ def _is_knowledge_gap(text: str) -> bool:
     return any(p in lower for p in KNOWLEDGE_GAP_PATTERNS)
 
 
-def _is_echo(question_text: str, answer_text: str, answer_words: list[str]) -> bool:
-    """True when the answer essentially repeats the question back.
+def _normalized(text: str) -> str:
+    """Lowercase, punctuation-free, whitespace-collapsed text for comparison."""
+    return re.sub(r"\s+", " ", re.sub(r"[^a-z'\s]", "", text.lower())).strip()
 
-    Restating the question is not answering it, but an echo is built from the
-    question's own topic vocabulary, so the relevance matcher would otherwise
-    score it as on-topic. We flag it when the answer re-uses the question's
-    content words in order (or the question verbatim) while adding almost no
-    new content of its own.
 
-    Directive verbs ("explain", "describe") are instructions, not content, so
-    they are excluded from the question's content words; a trailing "please
-    explain" in the answer must not defeat the check.
+def _is_repetition(
+    given_texts: list[str], answer_text: str, answer_words: list[str]
+) -> bool:
+    """True when the answer is essentially a copy of what the candidate was given.
+
+    Detects verbatim copies, near-duplicates (trivial edits), and re-worded
+    repetition, against the question AND the rubric (expected concepts,
+    requirements, optional depth points). Restating the prompt is not answering
+    it, but an echo is built from the prompt's own vocabulary, so the relevance
+    matcher would otherwise reward it.
+
+    A guard requires the answer to add almost no new content of its own
+    (``new_ratio``), so a genuine explanation that reuses the rubric's standard
+    vocabulary is not falsely flagged.
     """
-    q_clean = re.sub(r"\s+", " ", re.sub(r"[^a-z'\s]", "", question_text.lower())).strip()
-    a_clean = re.sub(r"\s+", " ", re.sub(r"[^a-z'\s]", "", answer_text.lower())).strip()
-    q_content = [w for w in _content_words(question_text) if w not in DIRECTIVE_VERBS]
+    a_clean = _normalized(answer_text)
+    if not a_clean:
+        return False
+    # A response that adds reasoning, examples or code is an answer, even if it
+    # reuses the prompt's vocabulary. Only copy-without-content is repetition.
+    if _looks_like_code(answer_text):
+        return False
+    if any(marker in answer_text.lower() for marker in REPETITION_EXPLANATION_MARKERS):
+        return False
+    given_content = set()
+    for text in given_texts:
+        given_content.update(_content_words(text))
     a_content = [w for w in answer_words if w not in STOPWORDS]
     if not a_content:
         return False
     a_set = set(a_content)
-    a_new = a_set - set(q_content) - DIRECTIVE_VERBS
+    # Synonyms of given words (e.g. "explanation" for "explain") are not new
+    # content, so a light rephrasing of the prompt is still detectable.
+    given_expanded = _expand_terms(given_content)
+    a_new = {
+        w for w in a_set if _word_group(w).isdisjoint(given_expanded)
+    } - DIRECTIVE_VERBS
     new_ratio = len(a_new) / len(a_set) if a_set else 0.0
-    if new_ratio > 0.25:
+    if new_ratio > MAX_REPETITION_NEW_RATIO:
         return False
-    if q_clean and q_clean in a_clean:
-        return True
-    if len(q_content) < 2:
+
+    from difflib import SequenceMatcher
+
+    for text in given_texts:
+        t_clean = _normalized(text)
+        if not t_clean:
+            continue
+        # A too-short given text (e.g. a bare expected concept like "Python")
+        # would match any answer that merely mentions it. Repetition is judged
+        # against phrases with real substance.
+        if len(_content_words(text)) < 3:
+            continue
+        # Verbatim / near-verbatim copy of a given string.
+        if t_clean in a_clean or a_clean in t_clean:
+            return True
+        # Trivial edits (typos, small reorderings, added filler).
+        if SequenceMatcher(None, t_clean, a_clean).ratio() >= REPETITION_SIMILARITY:
+            return True
+        # Re-worded: the given text's content words recur in order, and the
+        # answer is not much longer than the text it is restating.
+        t_content = [w for w in _content_words(text) if w not in DIRECTIVE_VERBS]
+        if len(t_content) < 2:
+            continue
+        if len(a_content) > len(t_content) * REPETITION_MAX_LENGTH_MULTIPLE:
+            continue
+        pos = 0
+        for w in a_content:
+            if pos < len(t_content) and w == t_content[pos]:
+                pos += 1
+        if pos / len(t_content) >= REPETITION_CONTAINMENT:
+            return True
+    return False
+
+
+def _is_keyword_stuffing(
+    domain_terms: set[str], words: list[str], word_count: int
+) -> bool:
+    """A dense burst of domain words with no connecting language is not an answer.
+
+    ``domain_terms`` = the answer's words that are glossary OR question
+    vocabulary (synonym-expanded). With zero glue words the candidate is
+    listing terms, not explaining them.
+    """
+    glue = {w for w in words if w in STOPWORDS}
+    if len(glue) > 0:
         return False
-    pos = 0
-    for w in a_content:
-        if pos < len(q_content) and w == q_content[pos]:
-            pos += 1
-    return pos / len(q_content) >= 0.9
+    if len(domain_terms) < 4:
+        return False
+    return (
+        word_count <= STUFFING_MAX_WORDS
+        and len(domain_terms) / max(word_count, 1) >= STUFFING_TECH_RATIO
+    )
+
+
+def _has_evidence(words: list[str], distinct: set[str], word_count: int) -> bool:
+    """Does the answer demonstrate understanding, or just mention keywords?
+
+    Evidence means real prose: enough words AND connecting language. A keyword
+    list ("decorator wrapper functools") has no glue; a one-word answer has no
+    structure. Both can mention the topic but do not explain it.
+    """
+    if word_count < MIN_EVIDENCE_WORDS:
+        return False
+    glue = sum(1 for w in words if w in STOPWORDS)
+    return glue / word_count >= MIN_EVIDENCE_PROSE_RATIO
 
 
 def _content_words(phrase: str) -> list[str]:
@@ -634,21 +867,59 @@ DIRECTIVE_VERBS = {
 }
 
 
+def _normalize_complexity(text: str) -> str:
+    """Turn big-O notation into words so the rubric matcher can see it.
+
+    "O(1)" is the answer to a "time complexity" requirement but the tokenizer
+    only sees "o" and "1". Spell it out so requirement matching and vocabulary
+    work on the semantics, not the typography.
+    """
+    text = re.sub(r"\bO\s*\(\s*1\s*\)", "constant time", text, flags=re.IGNORECASE)
+    text = re.sub(r"\bO\s*\(\s*log\s*\w*\s*\)", "logarithmic time", text, flags=re.IGNORECASE)
+    text = re.sub(r"\bO\s*\(\s*n\s*\)", "linear time", text, flags=re.IGNORECASE)
+    return text
+
+
+def _topic_vocabulary(
+    skill: str,
+    concept: str | None,
+    question_text: str,
+    expected_concepts: list[str],
+    core_requirements: list[str],
+) -> tuple[set[str], set[str]]:
+    """Question-specific vocabulary: topic terms and the broader relevant terms.
+
+    An answer is on-topic when it engages THIS question's concept words, not
+    just any technical vocabulary ("indexes/transactions" don't answer a
+    decorator question). Generic tech words still contribute, but with half the
+    weight. Both sides are synonym/inflection-expanded, so "begins" counts for
+    a rubric that says "begin".
+    """
+    topic_words: set[str] = set()
+    for phrase in [skill, concept or "", question_text] + expected_concepts + core_requirements:
+        topic_words.update(_content_words(phrase))
+    topic_vocab = _expand_terms(topic_words)
+    relevant_vocab = _expand_terms(set(TECH_TERMS)) | topic_vocab
+    return topic_vocab, relevant_vocab
+
+
 def _requirements_state(
     requirements: list[str],
     answer_words: list[str],
     *,
+    evidence: bool,
     word_count: int = 0,
     topic_hits: set[str] | None = None,
     noise: set[str] | None = None,
 ) -> tuple[list[str], list[str], list[str]]:
     """Classify each rubric requirement as satisfied / partial / missing.
 
-    A requirement is satisfied when the majority of its content words appear in
-    the answer (synonyms and common inflections count). Directive requirements
-    ("Give a usage example", "Explain how X works") are additionally satisfied
-    by a substantive, on-topic answer, so a concrete answer is not punished just
-    because it avoids the exact wording.
+    A requirement is only satisfied when the answer has EVIDENCE of
+    understanding (real prose, not a keyword list) AND the majority of its
+    content words appear (synonyms and common inflections count). Directive
+    requirements ("Give a usage example") are additionally satisfied by a
+    substantive, on-topic answer. Without evidence, everything is missing:
+    mentioning the rubric's words is not demonstrating the concept.
     """
     present = _expand_terms(set(answer_words))
     satisfied: list[str] = []
@@ -663,7 +934,9 @@ def _requirements_state(
             continue
         hit = sum(1 for w in content if not _word_group(w).isdisjoint(present))
         ratio = hit / len(content)
-        if ratio >= 0.6:
+        if not evidence:
+            missing.append(req)
+        elif ratio >= 0.6:
             satisfied.append(req)
         elif (
             directive
@@ -720,6 +993,159 @@ def _detect_misconceptions(misconceptions: list[str], answer_text: str) -> list[
             if pos == len(content):
                 found.append(mc)
     return found
+
+
+def _concept_status(
+    expected_concepts: list[str],
+    answer_words: list[str],
+    *,
+    satisfied: list[str],
+    evidence: bool,
+) -> tuple[list[str], list[str]]:
+    """Split expected concepts into ``(mentioned, demonstrated)``.
+
+    ``mentioned`` = the concept's words appear somewhere in the answer.
+    ``demonstrated`` = a subset of ``mentioned``: the answer shows real
+    evidence AND the concept's words are backed by a satisfied rubric
+    requirement. Mention is never understanding on its own.
+    """
+    present = _expand_terms(set(answer_words))
+    mentioned: list[str] = []
+    for concept in expected_concepts:
+        cw = _content_words(concept)
+        if cw and any(not _word_group(w).isdisjoint(present) for w in cw):
+            mentioned.append(concept)
+
+    demonstrated: list[str] = []
+    if not evidence or not satisfied:
+        return mentioned, demonstrated
+    sat_words: set[str] = set()
+    for req in satisfied:
+        sat_words.update(_content_words(req))
+    sat_expanded = _expand_terms(sat_words)
+    for concept in mentioned:
+        cw = _content_words(concept)
+        if any(not _word_group(w).isdisjoint(sat_expanded) for w in cw):
+            demonstrated.append(concept)
+    return mentioned, demonstrated
+
+
+# Vocabulary that shows the candidate actually did the reasoning the question
+# type asked for (vs. merely mentioning the topic).
+TYPE_REQUIREMENT_MARKERS: dict[str, set[str]] = {
+    "comparison": {
+        "vs", "versus", "compared", "compare", "comparing", "unlike", "whereas",
+        "while", "difference", "differences", "different", "differ", "instead",
+        "however", "but", "trade-off", "tradeoff", "similar", "similarly",
+        "both",
+    },
+    "tradeoff": {
+        "trade-off", "tradeoff", "trade", "cost", "costs", "however",
+        "instead", "vs", "versus", "benefit", "benefits", "pros", "cons",
+    },
+    "debugging": {
+        "check", "checked", "checking", "look", "looks", "looked", "run",
+        "runs", "trace", "traces", "cause", "causes", "error", "errors",
+        "diagnose", "diagnosing", "reproduce", "fix", "fixed", "fixing",
+        "hypothesis", "isolate", "log", "logs", "step", "steps",
+    },
+    "scenario": {
+        "would", "choose", "choosing", "chosen", "because", "trade-off",
+        "tradeoff", "prefer", "preferred", "preferring", "assuming", "decide",
+        "deciding", "depend", "depends", "depending",
+    },
+    "system_design": {
+        "scale", "scaling", "scalable", "load", "traffic", "latency",
+        "throughput", "cache", "caching", "availability", "consistency",
+        "shard", "sharding", "shards", "partition", "partitioning", "replica",
+        "replicas", "queue", "queues", "distribute", "distributing",
+        "distribution", "architecture", "architect",
+    },
+}
+
+
+def _looks_like_code(text: str) -> bool:
+    """Heuristic: does the answer contain actual code or code-shaped syntax?"""
+    t = text.lower()
+    patterns = (
+        r"\bdef\s+\w+", r"\bclass\s+\w+", r"\bimport\s+\w+", r"\bfrom\s+\w+\s+import",
+        r"\breturn\b", r"\blambda\b", r"\byield\b", r"\bfor\s+\w+\s+in\b", r"\bwhile\b",
+        r"\belse\s*:", r"\belif\b", r"->", r"==", r"!=", r"\+=", r"\{", r"\}",
+        r"\w+\s*=\s*\w+", r"\w+\s*\([^)]*\)\s*[:=]", r";",
+    )
+    return any(re.search(p, t) for p in patterns)
+
+
+def _question_type_satisfied(
+    question_type: str,
+    answer_text: str,
+    words: list[str],
+    word_count: int,
+    expected_concepts: list[str],
+) -> bool:
+    """Did the answer satisfy the question type's structural requirement?
+
+    Explanation/definition/behavioral answers only need prose evidence. The
+    other types demand the specific reasoning (code or an implementation
+    approach for coding, an actual comparison, a diagnostic approach, ...).
+    An answer that merely defines the topic does NOT satisfy a coding or
+    comparison question.
+    """
+    present = _expand_terms(set(words))
+    if question_type in {"explanation", "definition", "behavioral", "architecture"}:
+        return _has_evidence(words, present, word_count)
+
+    if question_type == "coding":
+        if _looks_like_code(answer_text):
+            return True
+        # No code, but a substantive implementation approach is acceptable.
+        if word_count < MIN_CODING_EXPLANATION_WORDS or not _has_evidence(words, present, word_count):
+            return False
+        return any(w in CODING_IMPLICATION_MARKERS for w in words)
+
+    if question_type == "comparison":
+        if not _has_evidence(words, present, word_count):
+            return False
+        lower = answer_text.lower()
+        contrast = TYPE_REQUIREMENT_MARKERS["comparison"]
+        if any(w in contrast for w in words) or any(
+            phrase in lower
+            for phrase in ("on the other hand", "in contrast", "by contrast",
+                           "versus", "vs.")
+        ):
+            return True
+        # No explicit contrast word, but the answer may still compare: it
+        # engages at least two of the entities the question asks about.
+        covered = sum(
+            1
+            for c in expected_concepts
+            if any(not _word_group(w).isdisjoint(present) for w in _content_words(c))
+        )
+        return covered >= 2 and word_count >= 12
+
+    if question_type in {"scenario", "tradeoff"}:
+        if not _has_evidence(words, present, word_count):
+            return False
+        markers = TYPE_REQUIREMENT_MARKERS.get(question_type, set())
+        if any(w in markers for w in words):
+            return True
+        # No explicit scenario word, but the answer may still reason about the
+        # situation: it engages at least two of the expected concepts with
+        # enough prose to be a real answer (e.g. "locks and deadlocks still
+        # need care" for a concurrency scenario).
+        covered = sum(
+            1
+            for c in expected_concepts
+            if any(not _word_group(w).isdisjoint(present) for w in _content_words(c))
+        )
+        return covered >= 2 and word_count >= 12
+
+    markers = TYPE_REQUIREMENT_MARKERS.get(question_type, set())
+    if not markers:
+        return _has_evidence(words, present, word_count)
+    if not _has_evidence(words, present, word_count):
+        return False
+    return any(w in markers for w in words)
 
 
 def _word_group(word: str) -> frozenset[str]:

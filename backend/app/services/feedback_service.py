@@ -5,16 +5,20 @@ exactly what they demonstrated, what is missing, what is incorrect, and what to
 study next. No generic "good answer, could improve" without evidence.
 """
 
-from app.services.ai.base import EvaluationDimensions
+from app.services.ai.base import NON_ANSWER_STATUSES, EvaluationDimensions
 
 STATUS_LABELS: dict[str, str] = {
-    "on_topic": "On topic",
+    "strong": "Strong answer",
     "partial": "Partially answered",
+    "incomplete": "Incomplete — task not fully answered",
     "incorrect": "Incorrect",
     "irrelevant": "Off topic",
     "knowledge_gap": "Knowledge gap",
     "contradictory": "Contradictory reasoning",
-    "nonsense": "Did not demonstrate understanding",
+    "keyword_stuffing": "Did not demonstrate understanding",
+    "question_repetition": "Repeated the question",
+    "nonsensical": "Not a recognizable answer",
+    "insufficient_evidence": "Concept named but not explained",
 }
 
 # Phrase used for concepts the candidate should go study.
@@ -44,9 +48,9 @@ class FeedbackService:
                 "What you demonstrated: " + self._list_joined(dims.satisfied_requirements)
             )
         strengths.extend(dims.strengths)
-        if status == "on_topic" and not dims.missing_requirements and not dims.satisfied_requirements:
+        if status == "strong" and not dims.missing_requirements and not dims.satisfied_requirements:
             strengths.append("You directly answered the question.")
-        if dims.missing_requirements and not dims.satisfied_requirements:
+        if status not in NON_ANSWER_STATUSES and dims.missing_requirements and not dims.satisfied_requirements:
             strengths.append("You attempted the question and covered the basics.")
 
         # --- What is incorrect ---------------------------------------------
@@ -82,7 +86,7 @@ class FeedbackService:
                 f"You said you don't know '{concept_name}' — no problem. "
                 "A short, honest answer like that is a clear signal of where to focus."
             )
-        elif status == "nonsense":
+        elif status == "keyword_stuffing":
             weaknesses.append(
                 "The answer lists related terms but does not explain them. "
                 "Listing keywords is not the same as demonstrating understanding."
@@ -91,14 +95,42 @@ class FeedbackService:
                 "The answer strings keywords together without explaining how they relate. "
                 "A useful answer explains the 'what' and the 'why' in plain sentences."
             )
-        elif status == "echo":
+        elif status == "question_repetition":
             weaknesses.append(
                 "The answer repeats the question instead of answering it. "
                 "Re-stating the prompt is not a response."
             )
             parts.append(
-                f"Your answer re-states the question about {concept_name} without adding anything. "
-                "Start with the mechanism, in your own words, and build up from there."
+                f"Your response repeats the question rather than answering it. "
+                f"You did not provide the requested content or explain the design "
+                f"decisions around '{concept_name}'."
+            )
+        elif status == "insufficient_evidence":
+            weaknesses.append(
+                f"'{concept_name}' is only named, not explained. Naming a concept "
+                "is not the same as understanding it."
+            )
+            parts.append(
+                f"You mentioned '{concept_name}' but didn't explain how or why. "
+                "Start with a concrete explanation or example in your own words."
+            )
+        elif status == "nonsensical":
+            weaknesses.append(
+                "The answer is not a recognizable response to the question."
+            )
+            parts.append(
+                "The answer couldn't be read as an explanation. Rewrite it as "
+                "plain, complete sentences that answer the question directly."
+            )
+        elif status == "incomplete":
+            weaknesses.append(
+                f"The answer is relevant but does not complete the task the "
+                f"question asked for ({question_type} question)."
+            )
+            parts.append(
+                f"Your answer addresses the topic but not the task: this is a "
+                f"{question_type} question, so it needs the specific reasoning "
+                f"the question asks for (code, a comparison, a diagnosis, ...)."
             )
         elif status == "incorrect":
             weaknesses.append(
@@ -130,7 +162,7 @@ class FeedbackService:
                 "You left out: " + self._list_joined(dims.missing_requirements) + "."
             )
 
-        if status in {"partial", "on_topic"} and not parts and dims.completeness_score < 6:
+        if status in {"partial", "strong", "incomplete"} and not parts and dims.completeness_score < 6:
             parts.append("Your answer is on the right track but could be more complete.")
 
         # --- Refine topics --------------------------------------------------
@@ -158,7 +190,7 @@ class FeedbackService:
     def _topics_from_missing(dims: EvaluationDimensions, concept_name: str) -> list[str]:
         """If no explicit topics came back, derive study targets from gaps."""
         topics = list(dims.missing_requirements)
-        if dims.answer_status in {"irrelevant", "knowledge_gap", "nonsense", "echo"}:
+        if dims.answer_status in NON_ANSWER_STATUSES:
             topics = [concept_name] + topics
         return topics[:4]
 

@@ -376,16 +376,17 @@ testable, and sufficient; ML would be over-engineering for this requirement.
 | `test_evaluation.py` | 503/502 AI failure paths, JSON parsing edge cases |
 | `test_reports.py` | score math, skill aggregation, completion flow, permissions |
 | `test_ai_service.py` | mock provider behavior (deterministic, offline) |
-| `test_evaluation_behavior.py` | evaluator behavior: concise=full credit, stuffing=nonsense, irrelevant≤2.5, misconception capped, echo (pasted question)≤1.5, partial drives a targeted follow-up, etc. |
-| `benchmark_cases.json` + `scripts/run_benchmark.py` | 36 cases across 15 categories, all must PASS (`python scripts/run_benchmark.py`, exit non-zero on any failure) |
+| `test_evaluation_behavior.py` | evaluator behavior: concise=full credit, stuffing=gated, irrelevant≤2, misconception capped, repeated question≤1, partial drives a targeted follow-up, etc. |
+| `test_answer_validation.py` | 10 acceptance tests: paste/paraphrase→repetition, keyword list→stuffing, single word→insufficient evidence, short complete→strong, off-topic→irrelevant, wrong-but-grammatical→incorrect, synonym terminology→strong, partial-with-gap→partial, definitions-only-to-coding→incomplete |
+| `benchmark_cases.json` + `scripts/run_benchmark.py` | 46 cases across 23 categories, all must PASS (`python scripts/run_benchmark.py`, exit non-zero on any failure) |
 
 The LLM is **fully mocked** (`ControllableAIService`) — tests never touch the network or
 an API key. SQLite foreign keys are enabled in tests so constraint bugs are caught in CI.
 
 ```bash
 cd backend
-python -m pytest -q              # 80 passed
-python scripts/run_benchmark.py  # 36/36 cases passed
+python -m pytest -q              # 90 passed
+python scripts/run_benchmark.py  # 46/46 cases passed
 ruff check app tests             # lint
 ```
 

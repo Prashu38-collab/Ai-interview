@@ -21,7 +21,7 @@ class Evaluation(TimestampMixin, Base):
     score: Mapped[float] = mapped_column(Float, nullable=False)
     # Structured evaluation dimensions (computed by the app's score engine
     # from the AI's analysis, never a single number straight from the LLM).
-    answer_status: Mapped[str] = mapped_column(String(30), default="on_topic", nullable=False)
+    answer_status: Mapped[str] = mapped_column(String(30), default="strong", nullable=False)
     relevance_score: Mapped[float] = mapped_column(Float, default=0, nullable=False)
     understanding_score: Mapped[float] = mapped_column(Float, default=0, nullable=False)
     correctness_score: Mapped[float] = mapped_column(Float, default=0, nullable=False)
@@ -30,6 +30,8 @@ class Evaluation(TimestampMixin, Base):
     satisfied_requirements: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
     partial_requirements: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
     missing_requirements: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    mentioned_concepts: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    demonstrated_concepts: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
     technical_errors: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
     misconceptions: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
     contradictions: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)

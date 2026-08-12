@@ -32,11 +32,11 @@ from app.services.ai.base import (
 def evaluation_dims(score: float = 7.0, **overrides) -> EvaluationDimensions:
     """Build EvaluationDimensions that the score engine maps to ``score``.
 
-    Equal dimension scores + ``on_topic`` status yield exactly ``score`` with
+    Equal dimension scores + ``strong`` status yield exactly ``score`` with
     the default (equal-ish) weights, keeping legacy tests predictable.
     """
     defaults = {
-        "answer_status": "on_topic",
+        "answer_status": "strong",
         "relevance_score": score,
         "understanding_score": score,
         "correctness_score": score,
