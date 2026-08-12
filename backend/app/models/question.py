@@ -20,11 +20,23 @@ class Question(TimestampMixin, Base):
 
     text: Mapped[str] = mapped_column(Text, nullable=False)
     skill: Mapped[str] = mapped_column(String(120), nullable=False)
+    # The concept this question targets (e.g. "decorators" under Python).
+    concept: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    # What the question wants to probe (e.g. "verify understanding of X").
+    intent: Mapped[str | None] = mapped_column(String(255), nullable=True)
     difficulty: Mapped[str] = mapped_column(String(10), default="medium", nullable=False)
     question_type: Mapped[str] = mapped_column(
         String(20), default="conceptual", nullable=False
     )
     expected_concepts: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    # Evaluation rubric, generated alongside the question.
+    core_requirements: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    optional_depth_points: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    common_misconceptions: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    # Set when this question is a coaching follow-up of another question.
+    follow_up_of: Mapped[int | None] = mapped_column(
+        ForeignKey("questions.id", ondelete="SET NULL"), index=True, nullable=True
+    )
     order_index: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     # pending | answered
