@@ -18,6 +18,38 @@ const DIFFICULTY_STYLE = {
   hard: "bg-clay-100 text-clay-700",
 };
 
+const REQ_TONES = {
+  sage: { box: "border-sage-200 bg-sage-50", head: "text-sage-600", mark: "text-sage-500" },
+  brand: { box: "border-brand-200 bg-brand-50", head: "text-brand-700", mark: "text-brand-500" },
+  clay: { box: "border-clay-200 bg-clay-50", head: "text-clay-600", mark: "text-clay-400" },
+};
+
+function RequirementList({ title, items, tone }) {
+  if (!items || items.length === 0) return null;
+  const t = REQ_TONES[tone];
+  return (
+    <div className={`rounded-xl border p-4 ${t.box}`}>
+      <h4 className={`mb-2 font-mono text-[11px] font-bold uppercase tracking-widest ${t.head}`}>
+        {title}
+      </h4>
+      <ul className="space-y-1 text-sm text-ink-soft">
+        {items.map((item, i) => (
+          <li key={i} className="flex gap-2">
+            <span className={t.mark}>·</span>
+            <span>{item}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function scoreTone(score) {
+  if (score >= 8) return "border-sage-300 bg-sage-50";
+  if (score >= 5) return "border-brand-300 bg-brand-50";
+  return "border-clay-300 bg-clay-50";
+}
+
 export default function Interview() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -27,6 +59,7 @@ export default function Interview() {
   const [current, setCurrent] = useState(null);
   const [answer, setAnswer] = useState("");
   const [result, setResult] = useState(null); // evaluation of the current question
+  const [followUp, setFollowUp] = useState(null); // queued follow-up question (QuestionOut)
   const [duplicateWarning, setDuplicateWarning] = useState(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -47,6 +80,15 @@ export default function Interview() {
     load();
   }, [load]);
 
+  async function refreshQuestions() {
+    try {
+      const qs = await getQuestions(id);
+      setQuestions(qs);
+    } catch (err) {
+      setError(errorMessage(err));
+    }
+  }
+
   async function handleGenerate() {
     setBusy(true);
     setError("");
@@ -54,6 +96,7 @@ export default function Interview() {
       await generateQuestions(id, interview.current_difficulty || "medium", true);
       setResult(null);
       setDuplicateWarning(null);
+      setFollowUp(null);
       setAnswer("");
       await load();
     } catch (err) {
@@ -71,10 +114,12 @@ export default function Interview() {
     try {
       const res = await submitAnswer(current.id, answer);
       setResult(res.evaluation);
+      setFollowUp(res.follow_up || null);
       setDuplicateWarning(res.duplicate_warning || null);
       setQuestions((qs) =>
         qs.map((q) => (q.id === current.id ? { ...q, status: "answered" } : q))
       );
+      await refreshQuestions(); // include any newly queued follow-up question
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -83,11 +128,29 @@ export default function Interview() {
   }
 
   function handleNext() {
-    const pending = questions.find((q) => q.status === "pending");
+    // Prefer a queued follow-up whose parent was already answered, matching
+    // the server's next_pending() ordering.
+    const followUpPending = questions.find(
+      (q) =>
+        q.status === "pending" &&
+        q.follow_up_of != null &&
+        questions.some((p) => p.id === q.follow_up_of && p.status === "answered")
+    );
+    const pending = followUpPending || questions.find((q) => q.status === "pending");
     setCurrent(pending || null);
+    setResult(null);
+    setFollowUp(null);
+    setDuplicateWarning(null);
+    setAnswer("");
+  }
+
+  function handleFollowUp() {
+    if (!followUp) return;
+    setCurrent(followUp);
     setResult(null);
     setDuplicateWarning(null);
     setAnswer("");
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   async function handleComplete() {
@@ -107,6 +170,12 @@ export default function Interview() {
 
   const answered = questions.filter((q) => q.status === "answered").length;
   const progress = questions.length ? Math.round((answered / questions.length) * 100) : 0;
+
+  const corrections = [
+    ...(result?.technical_errors || []),
+    ...(result?.misconceptions || []),
+    ...(result?.contradictions || []),
+  ].filter((c, i, arr) => arr.indexOf(c) === i);
 
   return (
     <Layout>
@@ -163,6 +232,11 @@ export default function Interview() {
             <span className="chip border border-paper-300 bg-paper-card text-ink-muted">
               {current.question_type}
             </span>
+            {current.follow_up_of != null && (
+              <span className="chip border border-brand-300 bg-brand-50 text-brand-700">
+                follow-up
+              </span>
+            )}
           </div>
           <h2 className="display text-2xl leading-snug">{current.text}</h2>
           <p className="font-mono text-[11px] uppercase tracking-widest text-ink-faint">
@@ -184,7 +258,7 @@ export default function Interview() {
               </div>
             </form>
           ) : (
-            <div className="space-y-5">
+            <div className="space-y-4">
               {duplicateWarning && (
                 <div className="flex items-start gap-3 rounded-xl border border-brand-300 bg-brand-50 px-4 py-3 text-sm text-brand-800">
                   <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-brand-500 font-mono text-[11px] font-bold text-paper-50">
@@ -197,30 +271,37 @@ export default function Interview() {
                 </div>
               )}
 
-              <div className="flex flex-col gap-4 rounded-xl bg-paper-50 p-5 sm:flex-row sm:items-center">
-                <div
-                  className={`grid h-20 w-20 shrink-0 place-items-center rounded-2xl border-2 ${
-                    result.score >= 8
-                      ? "border-sage-300 bg-sage-50"
-                      : result.score >= 5
-                        ? "border-brand-300 bg-brand-50"
-                        : "border-clay-300 bg-clay-50"
-                  }`}
-                >
-                  <div className="text-center">
-                    <div className="display text-3xl leading-none">{result.score}</div>
-                    <div className="font-mono text-[10px] uppercase tracking-widest text-ink-faint">
-                      / 10
+              {/* Coaching-first feedback: prose first, score secondary. */}
+              <div className="flex items-start justify-between gap-4 rounded-xl bg-paper-50 p-5">
+                <div className="min-w-0 space-y-1.5">
+                  <p className="eyebrow mb-1">Coaching feedback</p>
+                  <p className="text-sm leading-relaxed text-ink-soft">{result.feedback}</p>
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    <span className="chip border border-paper-300 bg-paper-card text-ink-muted">
+                      {result.answer_status}
+                    </span>
+                    {result.follow_up_question && (
+                      <span className="chip border border-brand-300 bg-brand-50 text-brand-700">
+                        ⇢ targeted follow-up queued
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="shrink-0">
+                  <div
+                    className={`grid h-16 w-16 place-items-center rounded-2xl border-2 ${scoreTone(result.score)}`}
+                  >
+                    <div className="text-center">
+                      <div className="display text-2xl leading-none">{result.score}</div>
+                      <div className="font-mono text-[9px] uppercase tracking-widest text-ink-faint">
+                        / 10
+                      </div>
                     </div>
                   </div>
                 </div>
-                <div>
-                  <p className="eyebrow mb-1">Feedback</p>
-                  <p className="text-sm leading-relaxed text-ink-soft">{result.feedback}</p>
-                </div>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2">
+              {result.strengths.length > 0 && (
                 <div className="rounded-xl border border-sage-200 bg-sage-50 p-4">
                   <h4 className="mb-2 font-mono text-[11px] font-bold uppercase tracking-widest text-sage-600">
                     Strengths
@@ -234,29 +315,46 @@ export default function Interview() {
                     ))}
                   </ul>
                 </div>
-                <div className="rounded-xl border border-clay-200 bg-clay-50 p-4">
-                  <h4 className="mb-2 font-mono text-[11px] font-bold uppercase tracking-widest text-clay-600">
-                    To improve
-                  </h4>
-                  <ul className="space-y-1 text-sm text-ink-soft">
-                    {result.weaknesses.map((w, i) => (
-                      <li key={i} className="flex gap-2">
-                        <span className="text-clay-400">−</span>
-                        <span>{w}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+              )}
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <RequirementList
+                  title="Demonstrated"
+                  items={result.satisfied_requirements}
+                  tone="sage"
+                />
+                <RequirementList
+                  title="Partially covered"
+                  items={result.partial_requirements}
+                  tone="brand"
+                />
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <RequirementList
+                  title="Not yet covered"
+                  items={result.missing_requirements}
+                  tone="clay"
+                />
+                <RequirementList title="To correct" items={corrections} tone="clay" />
               </div>
 
-              {result.missing_concepts.length > 0 && (
-                <p className="font-mono text-[11px] uppercase tracking-widest text-ink-faint">
-                  Missing: {result.missing_concepts.join(" · ")}
-                </p>
+              {followUp && (
+                <div className="rounded-xl border border-brand-300 bg-brand-50 p-4">
+                  <p className="eyebrow mb-1 text-brand-700">Targeted follow-up</p>
+                  <p className="text-sm leading-relaxed text-ink-soft">{followUp.text}</p>
+                  <p className="mt-1 font-mono text-[10px] uppercase tracking-widest text-brand-600">
+                    Deepens {followUp.concept} · {followUp.question_type} · {followUp.difficulty}
+                  </p>
+                  <div className="mt-3 flex justify-end">
+                    <button className="btn-primary" onClick={handleFollowUp} disabled={busy}>
+                      Answer follow-up →
+                    </button>
+                  </div>
+                </div>
               )}
 
               <div className="flex justify-end">
-                <button className="btn-primary" onClick={handleNext}>
+                <button className="btn-secondary" onClick={handleNext}>
                   Next question →
                 </button>
               </div>
