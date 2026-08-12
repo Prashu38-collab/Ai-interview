@@ -24,9 +24,12 @@ class PromptService:
         analysis_json: str,
         number: int,
         previous_questions: list[str],
+        previous_concepts: list[str],
+        plan: str,
     ) -> list[dict]:
         system, user = interview_prompts.question_generation_prompt(
-            target_role, experience_level, difficulty, analysis_json, number, previous_questions
+            target_role, experience_level, difficulty, analysis_json, number,
+            previous_questions, previous_concepts, plan,
         )
         return self._messages(system, user)
 
@@ -35,13 +38,20 @@ class PromptService:
         *,
         question_text: str,
         skill: str,
+        concept: str,
         difficulty: str,
         question_type: str,
+        intent: str,
         expected_concepts: list[str],
+        core_requirements: list[str],
+        optional_depth_points: list[str],
+        common_misconceptions: list[str],
         answer_text: str,
     ) -> list[dict]:
         system, user = interview_prompts.answer_evaluation_prompt(
-            question_text, skill, difficulty, question_type, expected_concepts, answer_text
+            question_text, skill, concept, difficulty, question_type, intent,
+            expected_concepts, core_requirements, optional_depth_points,
+            common_misconceptions, answer_text,
         )
         return self._messages(system, user)
 

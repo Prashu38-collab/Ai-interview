@@ -6,6 +6,7 @@ from app.models.user import User
 from app.routers.deps import get_ai_service, get_current_user
 from app.schemas.answer import AnswerCreate, AnswerSubmissionResponse
 from app.schemas.evaluation import EvaluationOut
+from app.schemas.question import QuestionOut
 from app.services.ai.base import AIService
 from app.services.evaluation_service import EvaluationService
 from app.services.question_service import QuestionService
@@ -23,8 +24,8 @@ def submit_answer(
 ) -> AnswerSubmissionResponse:
     """Submit an answer to a question; store it and evaluate it with the AI."""
     question = QuestionService(db).get_owned(question_id, current_user.id)
-    _, evaluation, next_difficulty, duplicate_of, duplicate_warning = EvaluationService(db).submit_answer(
-        question, payload.text, ai, model_used=ai.name
+    _, evaluation, next_difficulty, duplicate_of, duplicate_warning, follow_up = (
+        EvaluationService(db).submit_answer(question, payload.text, ai, model_used=ai.name)
     )
     return AnswerSubmissionResponse(
         question_id=question.id,
@@ -32,4 +33,5 @@ def submit_answer(
         next_difficulty=next_difficulty,
         duplicate_of=duplicate_of,
         duplicate_warning=duplicate_warning,
+        follow_up=QuestionOut.model_validate(follow_up) if follow_up else None,
     )

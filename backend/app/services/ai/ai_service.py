@@ -11,9 +11,10 @@ from pydantic import ValidationError
 
 from app.services.ai.base import (
     AIService,
-    AnswerEvaluation,
     CandidateAnalysis,
+    EvaluationDimensions,
     GeneratedQuestions,
+    QuestionPlanSlot,
     ReportSummary,
 )
 from app.services.ai.llm_service import (
@@ -66,7 +67,15 @@ class LLMAIService(AIService):
         number: int,
         difficulty: str,
         previous_questions: list[str],
+        previous_concepts: list[str],
+        plan: list[QuestionPlanSlot] | None = None,
     ) -> list:
+        slots = plan or []
+        plan_lines = "\n".join(
+            f"- slot {i + 1}: skill={s.skill}, concept={s.concept}, "
+            f"difficulty={s.difficulty}, type={s.question_type}"
+            for i, s in enumerate(slots)
+        ) or "none"
         messages = self.prompts.questions(
             target_role=target_role,
             experience_level=experience_level,
@@ -74,6 +83,8 @@ class LLMAIService(AIService):
             analysis_json=analysis.model_dump_json(),
             number=number,
             previous_questions=previous_questions,
+            previous_concepts=previous_concepts,
+            plan=plan_lines,
         )
 
         def parse(data: dict) -> list:
@@ -86,21 +97,33 @@ class LLMAIService(AIService):
         *,
         question_text: str,
         skill: str,
+        concept: str | None,
         difficulty: str,
         question_type: str,
+        intent: str | None,
         expected_concepts: list[str],
+        core_requirements: list[str],
+        optional_depth_points: list[str],
+        common_misconceptions: list[str],
         answer_text: str,
-    ) -> AnswerEvaluation:
+    ) -> EvaluationDimensions:
         messages = self.prompts.answer_evaluation(
             question_text=question_text,
             skill=skill,
+            concept=concept or skill,
             difficulty=difficulty,
             question_type=question_type,
+            intent=intent or "",
             expected_concepts=expected_concepts,
+            core_requirements=core_requirements,
+            optional_depth_points=optional_depth_points,
+            common_misconceptions=common_misconceptions,
             answer_text=answer_text,
         )
         return self._call(
-            messages, lambda data: AnswerEvaluation.model_validate(data), "answer evaluation"
+            messages,
+            lambda data: EvaluationDimensions.model_validate(data),
+            "answer evaluation",
         )
 
     def generate_report(

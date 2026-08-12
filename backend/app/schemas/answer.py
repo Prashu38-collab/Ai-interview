@@ -3,6 +3,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.schemas.evaluation import EvaluationOut
+from app.schemas.question import QuestionOut
 
 
 class AnswerCreate(BaseModel):
@@ -34,3 +35,4 @@ class AnswerSubmissionResponse(BaseModel):
     next_difficulty: str | None = None
     duplicate_of: int | None = None
     duplicate_warning: str | None = None
+    follow_up: QuestionOut | None = None

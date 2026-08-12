@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class EvaluationOut(BaseModel):
@@ -9,6 +9,22 @@ class EvaluationOut(BaseModel):
     id: int
     answer_id: int
     score: float
+    answer_status: str = "on_topic"
+    relevance_score: float = 0
+    understanding_score: float = 0
+    correctness_score: float = 0
+    completeness_score: float = 0
+    reasoning_score: float = 0
+    satisfied_requirements: list[str] = Field(default_factory=list)
+    partial_requirements: list[str] = Field(default_factory=list)
+    missing_requirements: list[str] = Field(default_factory=list)
+    technical_errors: list[str] = Field(default_factory=list)
+    misconceptions: list[str] = Field(default_factory=list)
+    contradictions: list[str] = Field(default_factory=list)
+    recommended_topics: list[str] = Field(default_factory=list)
+    follow_up_question: str = ""
+    follow_up_concept: str = ""
+    confidence: float = 0.5
     strengths: list[str]
     weaknesses: list[str]
     feedback: str
