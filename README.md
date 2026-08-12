@@ -70,9 +70,18 @@ report with skill-wise scores and concrete next steps.
 - 📄 **Resume + job description analysis** — candidate skills, required skills, gaps, topics.
 - 🆙 **PDF resume upload** — drag & drop a PDF; text is extracted server-side with
   `pypdf` and shown for confirmation before the interview is created.
-- ❓ **Personalized question generation** — role-, level- and resume-aware, deduplicated.
-  "Fresh questions" regenerates only the *unanswered* set, so you never repeat yourself.
-- ✍️ **Answer evaluation** — 0–10 score, strengths, weaknesses, feedback, missing concepts.
+- ❓ **Hybrid personalized question generation** — a concept bank + the interview
+  config + candidate history feed a question planner, which prompts the LLM for
+  a question **and its evaluation rubric**; output is validated and deduplicated
+  before it reaches the database. No pure "ask the model anything."
+- ✍️ **Structured answer evaluation** — the AI returns five dimensions (relevance,
+  understanding, correctness, completeness, reasoning), status, requirement lists
+  and misconceptions — **never a raw score**. `ScoreEngine` computes the 0–10
+  score deterministically with weights and hard gates, so scores are auditable.
+- 🎯 **Coaching-first feedback** — the UI leads with *what you demonstrated, what
+  was only partial, what's missing and what to correct*, with the score secondary.
+  Targeted **follow-up questions** deepen partial/weak answers (max depth 2 per
+  chain, one queued per concept).
 - ⚠️ **Duplicate-answer detection** — pasting the same answer for multiple questions is
   caught and flagged with a warning instead of silently passing.
 - 📈 **Adaptive difficulty** — rule-based (no ML) adjustment after every answer.
@@ -80,7 +89,8 @@ report with skill-wise scores and concrete next steps.
 - 🎨 **Distinctive UI** — warm, medium-tone "InterviewLab" aesthetic with self-hosted
   fonts (Fraunces, Manrope, JetBrains Mono), layered gradient backgrounds and staggered
   micro-animations.
-- 🧪 **60 automated tests** with a fully mocked LLM (no API key, no network).
+- 🧪 **77 automated tests + a 34-case evaluation benchmark** with a fully mocked
+  LLM (no API key, no network).
 - 🐳 **Docker Compose** — `docker compose up --build` runs the entire stack.
 - 🔄 **CI/CD** — GitHub Actions: tests, frontend build, Docker build.
 
@@ -244,20 +254,36 @@ curl -X POST http://localhost:8000/interviews \
 curl -X POST http://localhost:8000/questions/34/answer \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
-  -d '{"text": "asyncio uses an event loop to run coroutines concurrently..."}'
+  -d '{"text": "A decorator is a function that wraps another function and adds logic before and after the call."}'
 ```
 
 ```json
 {
   "question_id": 34,
   "evaluation": {
-    "score": 8.4,
-    "strengths": ["Correctly explained the event loop"],
-    "weaknesses": ["Did not mention cooperative multitasking"],
-    "feedback": "Strong understanding of async execution...",
-    "missing_concepts": ["cooperative multitasking"]
+    "score": 6.5,
+    "answer_status": "partial",
+    "relevance_score": 9.0,
+    "understanding_score": 5.3,
+    "correctness_score": 4.6,
+    "completeness_score": 3.8,
+    "reasoning_score": 9.0,
+    "satisfied_requirements": ["decorators are functions that take a callable and return a wrapped callable"],
+    "partial_requirements": ["functools.wraps preserves metadata"],
+    "missing_requirements": ["common uses: logging, timing, caching, auth"],
+    "misconceptions": [],
+    "feedback": "Some parts were only sketched: functools.wraps preserves metadata. You left out: ...",
+    "follow_up_question": "Walk me through what happens step by step: common uses: logging, timing, caching, auth?"
   },
-  "next_difficulty": "hard"
+  "next_difficulty": "medium",
+  "follow_up": {
+    "id": 39,
+    "text": "What is a Python decorator and why would you use one?",
+    "concept": "decorators",
+    "question_type": "definition",
+    "difficulty": "easy",
+    "follow_up_of": 34
+  }
 }
 ```
 
@@ -288,8 +314,11 @@ llm_service.py     # HTTP transport: auth header, timeouts, retries, JSON extrac
 
 ```
 Resume + JD  ──▶  CandidateAnalysis (skills, gaps, topics)
-Analysis     ──▶  QuestionData[] (text, skill, difficulty, type, concepts)
-Question + answer ──▶  AnswerEvaluation (score 0-10, strengths, weaknesses, feedback)
+Analysis     ──▶  concept bank + planner ──▶  LLM ──▶  validated QuestionData[]
+                   (question + rubric + misconceptions)
+Question + answer ──▶  LLM evaluation dimensions ──▶  ScoreEngine ──▶  score
+                   (the AI never produces a final score)
+                   ──▶  targeted follow-up question on partial/weak answers
 Scores       ──▶  ReportSummary (summary, strengths, weaknesses, recommendations)
 ```
 
@@ -335,25 +364,29 @@ testable, and sufficient; ML would be over-engineering for this requirement.
 
 ## Testing
 
-51 tests across 8 files (pytest + FastAPI TestClient + in-memory SQLite):
+77 tests across 9 files (pytest + FastAPI TestClient + in-memory SQLite) plus a
+34-case **evaluation benchmark** that pins scoring *behavior*:
 
 | File | Covers |
 |------|--------|
 | `test_auth.py` | register, duplicate email, login, wrong password, `/me` |
 | `test_interviews.py` | create/list/get, validation, 403/404 isolation, analysis |
-| `test_questions.py` | generation, dedup, batch limits, ordering, ownership |
+| `test_questions.py` | hybrid generation, dedup, batch limits, ordering, ownership |
 | `test_answers.py` | submission, blank rejection, already-answered, adaptive difficulty |
 | `test_evaluation.py` | 503/502 AI failure paths, JSON parsing edge cases |
 | `test_reports.py` | score math, skill aggregation, completion flow, permissions |
 | `test_ai_service.py` | mock provider behavior (deterministic, offline) |
+| `test_evaluation_behavior.py` | evaluator behavior: concise=full credit, stuffing=nonsense, irrelevant≤2.5, misconception capped, partial drives a targeted follow-up, etc. |
+| `benchmark_cases.json` + `scripts/run_benchmark.py` | 34 cases across 14 categories, all must PASS (`python scripts/run_benchmark.py`, exit non-zero on any failure) |
 
 The LLM is **fully mocked** (`ControllableAIService`) — tests never touch the network or
 an API key. SQLite foreign keys are enabled in tests so constraint bugs are caught in CI.
 
 ```bash
 cd backend
-python -m pytest -q        # 51 passed
-ruff check app tests       # lint (see pyproject.toml for the one intentional ignore)
+python -m pytest -q              # 77 passed
+python scripts/run_benchmark.py  # 34/34 cases passed
+ruff check app tests             # lint
 ```
 
 ## Docker Setup
@@ -464,7 +497,6 @@ palette (warm paper + burnt-copper accent, Fraunces/Manrope/JetBrains Mono typog
 ## Future Improvements
 
 - **Real provider defaults** — currently `mock`; flip to a real LLM in production.
-- **Follow-up questioning** — ask the candidate to elaborate on weak answers.
 - **Question timing** — enforce `duration_minutes` with a countdown.
 - **Question types** — add runnable coding exercises (judge execution, not just text).
 - **Team/assessment reports** — share a report link, hire-manager view.
@@ -481,6 +513,13 @@ palette (warm paper + burnt-copper accent, Fraunces/Manrope/JetBrains Mono typog
 - **Validate AI output at the boundary.** Assuming the LLM returns valid JSON breaks the
   app; Pydantic validation turns "maybe" into "handled error".
 - **Deterministic math + LLM narrative** is the right split for a report you can trust.
+- **Live smoke runs catch what unit tests miss.** The mock evaluator's `String(40)`
+  `intent` column quietly truncated long planner intents — surfaced only by running the
+  real flow against PostgreSQL (SQLite doesn't enforce lengths).
+- **A same-threshold cap can silently disable a feature.** A "don't explode the
+  interview" guard that suppressed follow-ups whenever ≥3 questions remained
+  unanswered meant a standard 5-question interview never got one; capping total
+  follow-ups instead keeps the coaching loop working.
 - **Small functions + a service layer** kept every file readable — which is what makes a
   project educational to revisit and extend.
 
