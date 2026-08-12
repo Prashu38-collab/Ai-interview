@@ -53,7 +53,7 @@ class Settings(BaseSettings):
     # These make the "score is not the source of truth" rule explicit.
     status_score_caps: str = (
         "on_topic:10,partial:7,incorrect:4.5,irrelevant:2,knowledge_gap:1.5,"
-        "contradictory:4,nonsense:1"
+        "contradictory:4,nonsense:1,echo:1.5"
     )
 
     model_config = SettingsConfigDict(

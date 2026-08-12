@@ -138,6 +138,7 @@ STOPWORDS = {
     "nor", "not", "of", "on", "or", "our", "out", "so", "the", "to", "us",
     "via", "was", "we", "who", "whom", "why", "you", "your", "yours",
     "he", "she", "him", "her", "his",
+    "please", "pls", "kindly", "thanks", "thank", "thx",
 }
 
 # Phrases that signal "I don't know" (a knowledge gap, not a wrong answer).
@@ -307,6 +308,24 @@ class MockAIService(AIService):
                 recommended_topics=[concept or skill],
                 confidence=0.9,
                 strengths=["Was honest about not knowing."],
+            )
+
+        # --- echo: repeating the question is not an answer ------------------
+        # Pasting the question back is made of the question's own topic
+        # vocabulary, so without this guard it looks fully on-topic and scores
+        # mid-range despite containing no answer at all.
+        if _is_echo(question_text, answer_text, words):
+            return EvaluationDimensions(
+                answer_status="echo",
+                relevance_score=2.0,
+                understanding_score=0.5,
+                correctness_score=0.5,
+                completeness_score=0,
+                reasoning_score=0,
+                missing_requirements=list(core_requirements),
+                recommended_topics=[concept or skill],
+                confidence=0.9,
+                strengths=[],
             )
 
         # --- topic vocabulary ------------------------------------------------
@@ -568,6 +587,41 @@ class MockAIService(AIService):
 def _is_knowledge_gap(text: str) -> bool:
     lower = " " + text.lower() + " "
     return any(p in lower for p in KNOWLEDGE_GAP_PATTERNS)
+
+
+def _is_echo(question_text: str, answer_text: str, answer_words: list[str]) -> bool:
+    """True when the answer essentially repeats the question back.
+
+    Restating the question is not answering it, but an echo is built from the
+    question's own topic vocabulary, so the relevance matcher would otherwise
+    score it as on-topic. We flag it when the answer re-uses the question's
+    content words in order (or the question verbatim) while adding almost no
+    new content of its own.
+
+    Directive verbs ("explain", "describe") are instructions, not content, so
+    they are excluded from the question's content words; a trailing "please
+    explain" in the answer must not defeat the check.
+    """
+    q_clean = re.sub(r"\s+", " ", re.sub(r"[^a-z'\s]", "", question_text.lower())).strip()
+    a_clean = re.sub(r"\s+", " ", re.sub(r"[^a-z'\s]", "", answer_text.lower())).strip()
+    q_content = [w for w in _content_words(question_text) if w not in DIRECTIVE_VERBS]
+    a_content = [w for w in answer_words if w not in STOPWORDS]
+    if not a_content:
+        return False
+    a_set = set(a_content)
+    a_new = a_set - set(q_content) - DIRECTIVE_VERBS
+    new_ratio = len(a_new) / len(a_set) if a_set else 0.0
+    if new_ratio > 0.25:
+        return False
+    if q_clean and q_clean in a_clean:
+        return True
+    if len(q_content) < 2:
+        return False
+    pos = 0
+    for w in a_content:
+        if pos < len(q_content) and w == q_content[pos]:
+            pos += 1
+    return pos / len(q_content) >= 0.9
 
 
 def _content_words(phrase: str) -> list[str]:

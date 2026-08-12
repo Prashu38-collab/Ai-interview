@@ -192,3 +192,34 @@ def test_strong_answer_produces_no_follow_up(client, auth_headers, make_intervie
     body = res.json()
     assert body["evaluation"]["score"] >= 7.0
     assert body["follow_up"] is None
+
+
+def test_pasting_the_question_is_an_echo_not_an_answer():
+    ai = MockAIService()
+    question = "Explain how a Python decorator works."
+    dims, score = _evaluate(ai, question)
+    assert dims.answer_status == "echo"
+    assert score <= 1.5
+    assert not dims.satisfied_requirements
+
+
+def test_reworded_echo_is_still_flagged():
+    ai = MockAIService()
+    dims, score = _evaluate(
+        ai,
+        "Explain how a Python decorator works, please.",
+    )
+    assert dims.answer_status == "echo"
+    assert score <= 1.5
+
+
+def test_echo_with_a_real_explanation_is_not_flagged():
+    ai = MockAIService()
+    dims, score = _evaluate(
+        ai,
+        "Explain how a Python decorator works. A decorator is a function that "
+        "takes another function and returns a wrapper that adds behaviour "
+        "before and after the call.",
+    )
+    assert dims.answer_status == "on_topic"
+    assert score >= 7.0

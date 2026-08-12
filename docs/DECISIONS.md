@@ -97,6 +97,11 @@ Read this after the README to understand *why*, not just *what*.
 - A partial answer gets a targeted follow-up aimed at the *specific* gap (`_pick_gap`), at equal-or-easier difficulty. The caps keep it coaching, not an interview that grows forever: max depth 2 per chain, one queued follow-up per concept, max 3 follow-ups per interview, and strong/irrelevant/knowledge-gap answers never trigger one.
 - An earlier "no follow-ups while ≥3 questions remain unanswered" guard *silently disabled* the feature for standard 5-question interviews — a lesson in same-threshold caps (see README "Lessons Learned").
 
+## Why repeating the question back is its own status ("echo")
+- Pasting the question is the cheapest "answer" that can still look on-topic, because a question is built out of its own topic vocabulary — the relevance matcher rewards exactly those words. A user reported it scoring ~6.
+- `_is_echo` flags an answer when it re-uses the question's content words in order (or verbatim) while adding almost no new content (`new_ratio ≤ 0.25`). Directive verbs ("explain") are excluded from the question's content words so a trailing "please explain" doesn't defeat it, and answers that add real substance (a full explanation after the paste, or a concise-but-added point) are protected from false flags by the same new-content requirement.
+- Echo gets a hard gate (`echo:1.5`) and its own coaching message in the feedback panel, matching how `nonsense` and `knowledge_gap` are treated.
+
 ## Why the scoring dimensions are surfaced verbatim in the UI
 - Coaching-first feedback (demonstrated / partial / missing / corrections, with the score demoted to a badge) is what a candidate can actually act on. The structured fields are returned by the API (`AnswerSubmissionResponse`) and rendered directly, so the frontend never re-derives what the evaluator concluded.
 

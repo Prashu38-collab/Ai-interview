@@ -91,6 +91,15 @@ class FeedbackService:
                 "The answer strings keywords together without explaining how they relate. "
                 "A useful answer explains the 'what' and the 'why' in plain sentences."
             )
+        elif status == "echo":
+            weaknesses.append(
+                "The answer repeats the question instead of answering it. "
+                "Re-stating the prompt is not a response."
+            )
+            parts.append(
+                f"Your answer re-states the question about {concept_name} without adding anything. "
+                "Start with the mechanism, in your own words, and build up from there."
+            )
         elif status == "incorrect":
             weaknesses.append(
                 "The core claim is not correct. Explain the mechanism instead of asserting it."
@@ -149,7 +158,7 @@ class FeedbackService:
     def _topics_from_missing(dims: EvaluationDimensions, concept_name: str) -> list[str]:
         """If no explicit topics came back, derive study targets from gaps."""
         topics = list(dims.missing_requirements)
-        if dims.answer_status in {"irrelevant", "knowledge_gap", "nonsense"}:
+        if dims.answer_status in {"irrelevant", "knowledge_gap", "nonsense", "echo"}:
             topics = [concept_name] + topics
         return topics[:4]
 

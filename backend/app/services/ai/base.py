@@ -97,7 +97,8 @@ class QuestionPlanSlot(BaseModel):
 
 
 # The possible statuses of an evaluated answer. "knowledge_gap" covers
-# "I don't know"; "nonsense" covers keyword stuffing and word salads.
+# "I don't know"; "nonsense" covers keyword stuffing and word salads;
+# "echo" covers answers that just repeat the question back.
 ANSWER_STATUSES: tuple[str, ...] = (
     "on_topic",
     "partial",
@@ -106,6 +107,7 @@ ANSWER_STATUSES: tuple[str, ...] = (
     "knowledge_gap",
     "contradictory",
     "nonsense",
+    "echo",
 )
 
 

@@ -39,6 +39,7 @@ EXPECTATIONS: dict[str, dict] = {
     "verbose_irrelevant": {"statuses": {"partial", "irrelevant", "incorrect"}, "max": 7.0},
     "contradictory": {"statuses": {"contradictory"}, "max": 4.0},
     "unknown": {"statuses": {"knowledge_gap"}, "max": 2.0},
+    "echo": {"statuses": {"echo"}, "max": 1.5},
     "scenario": {"statuses": {"on_topic"}, "min": 7.0},
     "debugging": {"statuses": {"on_topic"}, "min": 7.0},
     "coding": {"statuses": {"on_topic"}, "min": 7.0},

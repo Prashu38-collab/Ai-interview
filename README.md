@@ -89,7 +89,7 @@ report with skill-wise scores and concrete next steps.
 - 🎨 **Distinctive UI** — warm, medium-tone "InterviewLab" aesthetic with self-hosted
   fonts (Fraunces, Manrope, JetBrains Mono), layered gradient backgrounds and staggered
   micro-animations.
-- 🧪 **77 automated tests + a 34-case evaluation benchmark** with a fully mocked
+- 🧪 **80 automated tests + a 36-case evaluation benchmark** with a fully mocked
   LLM (no API key, no network).
 - 🐳 **Docker Compose** — `docker compose up --build` runs the entire stack.
 - 🔄 **CI/CD** — GitHub Actions: tests, frontend build, Docker build.
@@ -365,7 +365,7 @@ testable, and sufficient; ML would be over-engineering for this requirement.
 ## Testing
 
 77 tests across 9 files (pytest + FastAPI TestClient + in-memory SQLite) plus a
-34-case **evaluation benchmark** that pins scoring *behavior*:
+36-case **evaluation benchmark** that pins scoring *behavior*:
 
 | File | Covers |
 |------|--------|
@@ -376,16 +376,16 @@ testable, and sufficient; ML would be over-engineering for this requirement.
 | `test_evaluation.py` | 503/502 AI failure paths, JSON parsing edge cases |
 | `test_reports.py` | score math, skill aggregation, completion flow, permissions |
 | `test_ai_service.py` | mock provider behavior (deterministic, offline) |
-| `test_evaluation_behavior.py` | evaluator behavior: concise=full credit, stuffing=nonsense, irrelevant≤2.5, misconception capped, partial drives a targeted follow-up, etc. |
-| `benchmark_cases.json` + `scripts/run_benchmark.py` | 34 cases across 14 categories, all must PASS (`python scripts/run_benchmark.py`, exit non-zero on any failure) |
+| `test_evaluation_behavior.py` | evaluator behavior: concise=full credit, stuffing=nonsense, irrelevant≤2.5, misconception capped, echo (pasted question)≤1.5, partial drives a targeted follow-up, etc. |
+| `benchmark_cases.json` + `scripts/run_benchmark.py` | 36 cases across 15 categories, all must PASS (`python scripts/run_benchmark.py`, exit non-zero on any failure) |
 
 The LLM is **fully mocked** (`ControllableAIService`) — tests never touch the network or
 an API key. SQLite foreign keys are enabled in tests so constraint bugs are caught in CI.
 
 ```bash
 cd backend
-python -m pytest -q              # 77 passed
-python scripts/run_benchmark.py  # 34/34 cases passed
+python -m pytest -q              # 80 passed
+python scripts/run_benchmark.py  # 36/36 cases passed
 ruff check app tests             # lint
 ```
 

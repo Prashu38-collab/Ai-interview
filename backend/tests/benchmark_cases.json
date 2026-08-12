@@ -11,6 +11,7 @@
     "verbose_irrelevant": "long padded answers -> stay low",
     "contradictory": "self-contradictory answers -> capped at 4",
     "unknown": "honest 'I don't know' -> knowledge_gap, capped at 2",
+    "echo": "repeating the question back -> echo, capped at 1.5",
     "scenario": "good answer to a scenario question",
     "debugging": "good answer to a debugging question",
     "coding": "good answer to a coding question",
@@ -232,6 +233,24 @@
       "concept": "query optimization",
       "question_type": "explanation",
       "answer": "I'm not sure, we haven't covered query plans in my course."
+    },
+    {
+      "id": "echo-decorators-verbatim",
+      "category": "echo",
+      "skill": "Python",
+      "concept": "decorators",
+      "question_type": "explanation",
+      "question_text": "Explain how a Python decorator wraps a function to extend its behaviour.",
+      "answer": "Explain how a Python decorator wraps a function to extend its behaviour."
+    },
+    {
+      "id": "echo-indexes-reworded",
+      "category": "echo",
+      "skill": "PostgreSQL",
+      "concept": "indexes",
+      "question_type": "explanation",
+      "question_text": "Explain how an index speeds up lookup and the costs it adds.",
+      "answer": "How an index speeds up lookup and the costs it adds, please explain."
     },
     {
       "id": "scenario-data-structures-dedup",
