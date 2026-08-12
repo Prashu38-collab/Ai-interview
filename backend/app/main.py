@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.core.config import get_settings
-from app.routers import answers, auth, interviews, questions, reports
+from app.routers import answers, auth, interviews, questions, reports, resume
 from app.services.ai.llm_service import AIProviderError, AIResponseError
 
 settings = get_settings()
@@ -52,6 +52,7 @@ def create_app() -> FastAPI:
     app.include_router(questions.router)
     app.include_router(answers.router)
     app.include_router(reports.router)
+    app.include_router(resume.router)
 
     @app.get("/health")
     def health() -> dict[str, str]:
