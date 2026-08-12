@@ -20,6 +20,9 @@ class QuestionOut(BaseModel):
 
 class GenerateQuestionsRequest(BaseModel):
     difficulty: str = Field(default="medium", pattern="^(easy|medium|hard)$")
+    # When true, unanswered questions are replaced with a fresh set instead of
+    # the previous ones being reused/ignored.
+    replace_pending: bool = False
 
 
 class GenerateQuestionsResponse(BaseModel):

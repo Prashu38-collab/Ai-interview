@@ -32,16 +32,42 @@ SKILL_KEYWORDS: dict[str, list[str]] = {
     "AWS": ["aws", "s3", "ec2", "lambda", "cloud"],
 }
 
-# Generic question templates by (difficulty, type). The mock fills in the skill.
-QUESTION_TEMPLATES: dict[tuple[str, str], str] = {
-    ("easy", "conceptual"): "Explain what {skill} is and give a simple example of where it is used.",
-    ("easy", "behavioral"): "Describe a project where you used {skill} and what you learned.",
-    ("medium", "conceptual"): "Explain how {skill} works under the hood and describe a real-world scenario where it is a good fit.",
-    ("medium", "coding"): "Sketch the key pieces of a small program that uses {skill} to solve a practical problem.",
-    ("medium", "scenario"): "You are debugging a production issue related to {skill}. Walk through your approach.",
-    ("hard", "conceptual"): "Compare {skill} with its closest alternative and discuss the trade-offs in a production system.",
-    ("hard", "scenario"): "Design a solution using {skill} for a high-scale system. Discuss bottlenecks and mitigations.",
-    ("hard", "behavioral"): "Tell me about the most challenging problem you solved using {skill} and how you approached it.",
+# Generic question templates by (difficulty, type). The mock fills in the
+# skill. Several variants per slot give variety when the same (difficulty,
+# type) repeats, so questions don't feel copy-pasted.
+QUESTION_TEMPLATES: dict[tuple[str, str], list[str]] = {
+    ("easy", "conceptual"): [
+        "Explain what {skill} is and give a simple example of where it is used.",
+        "In your own words, what is {skill} and when would you reach for it?",
+    ],
+    ("easy", "behavioral"): [
+        "Describe a project where you used {skill} and what you learned from it.",
+        "Tell me about a time {skill} helped you solve a problem at work or school.",
+    ],
+    ("medium", "conceptual"): [
+        "Explain how {skill} works under the hood and describe a real-world scenario where it is a good fit.",
+        "Walk through the core ideas behind {skill} and what a team should understand before adopting it.",
+    ],
+    ("medium", "coding"): [
+        "Sketch the key pieces of a small program that uses {skill} to solve a practical problem.",
+        "Write pseudocode for a feature that relies on {skill}. What are the important decisions?",
+    ],
+    ("medium", "scenario"): [
+        "You are debugging a production issue related to {skill}. Walk through your approach.",
+        "A service built around {skill} is degrading in production. How do you investigate and fix it?",
+    ],
+    ("hard", "conceptual"): [
+        "Compare {skill} with its closest alternative and discuss the trade-offs in a production system.",
+        "What are the sharp edges of {skill} in a real system, and how do you mitigate them?",
+    ],
+    ("hard", "scenario"): [
+        "Design a solution using {skill} for a high-scale system. Discuss bottlenecks and mitigations.",
+        "Your team must scale a system that depends on {skill}. Present your architecture and its failure modes.",
+    ],
+    ("hard", "behavioral"): [
+        "Tell me about the most challenging problem you solved using {skill} and how you approached it.",
+        "Describe a disagreement about {skill} you had with a colleague and how you resolved it.",
+    ],
 }
 
 
@@ -90,13 +116,15 @@ class MockAIService(AIService):
         questions: list[QuestionData] = []
         seen: set[str] = set(previous_questions)
         i = 0
-        while len(questions) < number and i < number * 4:
+        while len(questions) < number and i < number * 6:
             skill = skills[i % len(skills)]
             q_type = type_cycle[i % len(type_cycle)]
-            # Rotate difficulty around the target, staying inside [easy..hard].
-            rank = max(0, min(2, target + (i // len(skills)) % 2 - (i // len(skills)) % 2))
+            # Alternate around the target difficulty (down -> same -> up) so a
+            # batch mixes easy/medium/hard instead of all being the target.
+            rank = max(0, min(2, target + (i // len(skills)) % 3 - 1))
             diff = ["easy", "medium", "hard"][rank]
-            template = QUESTION_TEMPLATES.get((diff, q_type)) or QUESTION_TEMPLATES[("medium", "conceptual")]
+            variants = QUESTION_TEMPLATES.get((diff, q_type)) or QUESTION_TEMPLATES[("medium", "conceptual")]
+            template = variants[(i // len(skills)) % len(variants)]
             text = template.format(skill=skill)
             if text not in seen:
                 seen.add(text)

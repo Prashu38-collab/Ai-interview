@@ -28,7 +28,10 @@ def generate_questions(
     """Generate interview questions for the given interview (deduplicated)."""
     interview = InterviewService(db).get_owned(interview_id, current_user.id)
     difficulty = (payload.difficulty if payload else None) or interview.current_difficulty
-    questions = QuestionService(db).generate(interview, ai, difficulty=difficulty)
+    replace_pending = bool(payload.replace_pending) if payload else False
+    questions = QuestionService(db).generate(
+        interview, ai, difficulty=difficulty, replace_pending=replace_pending
+    )
     return GenerateQuestionsResponse(
         generated=len(questions),
         questions=[QuestionOut.model_validate(q) for q in questions],

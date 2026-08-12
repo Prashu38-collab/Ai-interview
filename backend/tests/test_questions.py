@@ -123,3 +123,58 @@ def test_list_questions_returns_ordered(client, auth_headers, make_interview, ov
     questions = res.json()
     assert len(questions) == 3
     assert all(q["status"] == "pending" for q in questions)
+
+
+def test_regenerate_replaces_pending_questions(client, auth_headers, make_interview, override_ai):
+    first_pool = [
+        QuestionData(
+            question=f"First batch question {i}.",
+            skill="Python",
+            difficulty="medium",
+            question_type="conceptual",
+            expected_concepts=["x"],
+        )
+        for i in range(3)
+    ]
+    second_pool = [
+        QuestionData(
+            question=f"Fresh batch question {i}.",
+            skill="Python",
+            difficulty="medium",
+            question_type="conceptual",
+            expected_concepts=["y"],
+        )
+        for i in range(3)
+    ]
+
+    fake = ControllableAIService(questions=first_pool)
+    override_ai(fake)
+    interview_id = make_interview(number_of_questions=3)
+    client.post(f"/interviews/{interview_id}/generate-questions", headers=auth_headers)
+
+    # Answer the first question; it must survive regeneration.
+    qs = client.get(f"/interviews/{interview_id}/questions", headers=auth_headers).json()
+    client.post(
+        f"/questions/{qs[0]['id']}/answer",
+        json={"text": "A committed answer."},
+        headers=auth_headers,
+    )
+
+    fake._questions = second_pool
+    res = client.post(
+        f"/interviews/{interview_id}/generate-questions",
+        json={"difficulty": "medium", "replace_pending": True},
+        headers=auth_headers,
+    )
+    assert res.status_code == 200
+    body = res.json()
+    assert body["generated"] == 3
+
+    final = client.get(f"/interviews/{interview_id}/questions", headers=auth_headers).json()
+    texts = {q["text"] for q in final}
+    # The answered question survives; the two pending ones are replaced fresh.
+    assert "First batch question 0." in texts
+    assert "First batch question 1." not in texts
+    assert "Fresh batch question 0." in texts
+    assert len([q for q in final if q["status"] == "answered"]) == 1
+    assert len(final) == 3

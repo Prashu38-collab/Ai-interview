@@ -16,12 +16,20 @@ class QuestionService:
     # ------------------------------------------------------------------
     # Generation
     # ------------------------------------------------------------------
-    def generate(self, interview: Interview, ai: AIService, difficulty: str = "medium") -> list[Question]:
+    def generate(
+        self,
+        interview: Interview,
+        ai: AIService,
+        difficulty: str = "medium",
+        replace_pending: bool = False,
+    ) -> list[Question]:
         """Generate questions for an interview, filling up to its target count.
 
         - Auto-runs analysis first if missing (smoother client flow).
         - Passes existing question texts to the AI so it avoids repeats.
         - Skips any returned duplicate at the DB level too.
+        - With ``replace_pending=True``, removes all unanswered questions first
+          so the regenerated set is fresh instead of repeating the old ones.
         """
         if not interview.analysis:
             analysis = ai.analyze_candidate(
@@ -35,6 +43,13 @@ class QuestionService:
             analysis = CandidateAnalysis.model_validate(interview.analysis)
 
         existing = list(self._questions_for(interview.id))
+        if replace_pending:
+            for q in existing:
+                if q.status == "pending":
+                    self.db.delete(q)
+            self.db.flush()
+            existing = [q for q in existing if q.status != "pending"]
+
         existing_texts = [q.text for q in existing]
 
         number_needed = max(0, interview.number_of_questions - len(existing))
