@@ -20,9 +20,19 @@ export async function analyzeInterview(id) {
   return data;
 }
 
-export async function generateQuestions(id, difficulty) {
+export async function extractResume(file) {
+  const form = new FormData();
+  form.append("file", file);
+  const { data } = await client.post("/resume/extract", form, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return data;
+}
+
+export async function generateQuestions(id, difficulty, replacePending = false) {
   const { data } = await client.post(`/interviews/${id}/generate-questions`, {
     difficulty,
+    replace_pending: replacePending,
   });
   return data;
 }

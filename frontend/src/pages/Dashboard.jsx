@@ -14,6 +14,19 @@ const STATUS_LABELS = {
   completed: "Completed",
 };
 
+const STATUS_STYLE = {
+  created: "bg-paper-200 text-ink-muted",
+  ready: "bg-brand-100 text-brand-700",
+  in_progress: "bg-sage-100 text-sage-600",
+  completed: "bg-ink text-paper-50",
+};
+
+function scoreTone(score) {
+  if (score >= 8) return "text-sage-600";
+  if (score >= 5) return "text-brand-600";
+  return "text-clay-600";
+}
+
 export default function Dashboard() {
   const [interviews, setInterviews] = useState(null);
   const [error, setError] = useState("");
@@ -24,88 +37,133 @@ export default function Dashboard() {
       .catch((err) => setError(errorMessage(err)));
   }, []);
 
+  const total = interviews?.length ?? 0;
+  const inProgress = interviews?.filter((i) => i.status === "in_progress").length ?? 0;
+  const completed = interviews?.filter((i) => i.status === "completed").length ?? 0;
+  const scores = interviews?.map((i) => i.report_overall_score).filter((s) => s != null) ?? [];
+  const avgScore = scores.length
+    ? (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1)
+    : "—";
+
+  const stats = [
+    { label: "Interviews", value: total, hint: "total created" },
+    { label: "In progress", value: inProgress, hint: "active sessions" },
+    { label: "Completed", value: completed, hint: "with reports" },
+    { label: "Avg. score", value: avgScore, hint: "across reports" },
+  ];
+
   return (
     <Layout>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-8 flex items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
-          <p className="text-sm text-slate-500">Your past and ongoing interviews.</p>
+          <p className="eyebrow mb-1">Overview</p>
+          <h1 className="display text-4xl">Dashboard</h1>
         </div>
         <Link to="/interviews/new" className="btn-primary">
-          + New Interview
+          <span aria-hidden>+</span> New interview
         </Link>
       </div>
 
       {error && <ErrorBox message={error} />}
-      {!interviews && !error && <Spinner />}
+      {!interviews && !error && <Spinner label="Loading interviews…" />}
 
-      {interviews && interviews.length === 0 && (
-        <EmptyState
-          title="No interviews yet"
-          description="Create your first interview by pasting a job description and your resume. The AI will generate a personalized technical interview."
-          action={
-            <Link to="/interviews/new" className="btn-primary">
-              Create an interview
-            </Link>
-          }
-        />
-      )}
+      {interviews && (
+        <>
+          <div className="mb-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
+            {stats.map((s, i) => (
+              <div
+                key={s.label}
+                className="card stagger p-5"
+                style={{ "--d": `${i * 70}ms` }}
+              >
+                <p className="font-mono text-[10px] font-bold uppercase tracking-widest text-ink-faint">
+                  {s.label}
+                </p>
+                <p className="display mt-1.5 text-3xl">{s.value}</p>
+                <p className="mt-0.5 text-xs text-ink-muted">{s.hint}</p>
+              </div>
+            ))}
+          </div>
 
-      {interviews && interviews.length > 0 && (
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-          <table className="w-full text-left text-sm">
-            <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500">
-              <tr>
-                <th className="px-4 py-3">Target role</th>
-                <th className="px-4 py-3">Level</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Progress</th>
-                <th className="px-4 py-3">Score</th>
-                <th className="px-4 py-3">Date</th>
-                <th className="px-4 py-3" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {interviews.map((i) => (
-                <tr key={i.id} className="hover:bg-slate-50">
-                  <td className="px-4 py-3 font-medium text-slate-900">{i.target_role}</td>
-                  <td className="px-4 py-3 text-slate-600">{i.experience_level}</td>
-                  <td className="px-4 py-3">
-                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
-                      {STATUS_LABELS[i.status] || i.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-slate-600">
-                    {i.answered_count}/{i.question_count}
-                  </td>
-                  <td className="px-4 py-3">
-                    {i.report_overall_score != null ? (
-                      <span className="font-semibold text-brand-600">
-                        {i.report_overall_score}/10
-                      </span>
-                    ) : (
-                      <span className="text-slate-400">—</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-slate-500">
-                    {new Date(i.created_at).toLocaleDateString()}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    {i.status === "completed" ? (
-                      <Link to={`/interviews/${i.id}/report`} className="font-medium text-brand-600 hover:underline">
-                        Report →
-                      </Link>
-                    ) : (
-                      <Link to={`/interviews/${i.id}`} className="font-medium text-brand-600 hover:underline">
-                        Open →
-                      </Link>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+          {interviews.length === 0 ? (
+            <EmptyState
+              title="No interviews yet"
+              description="Create your first interview by pasting a job description and uploading your resume as a PDF. The AI builds a personalized question set around both."
+              action={
+                <Link to="/interviews/new" className="btn-primary">
+                  Create an interview
+                </Link>
+              }
+            />
+          ) : (
+            <div className="card overflow-hidden p-0">
+              <div className="flex items-center justify-between border-b border-paper-200 px-6 py-4">
+                <h2 className="display text-lg">Interview history</h2>
+                <span className="font-mono text-[11px] uppercase tracking-widest text-ink-faint">
+                  {total} record{total === 1 ? "" : "s"}
+                </span>
+              </div>
+              <table className="w-full text-left text-sm">
+                <thead className="border-b border-paper-200 bg-paper-50 font-mono text-[10px] uppercase tracking-widest text-ink-faint">
+                  <tr>
+                    <th className="px-6 py-3">Target role</th>
+                    <th className="hidden px-4 py-3 md:table-cell">Level</th>
+                    <th className="px-4 py-3">Status</th>
+                    <th className="hidden px-4 py-3 sm:table-cell">Progress</th>
+                    <th className="px-4 py-3">Score</th>
+                    <th className="px-6 py-3" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-paper-100">
+                  {interviews.map((i) => (
+                    <tr key={i.id} className="stagger transition-colors hover:bg-paper-50" style={{ "--d": "0ms" }}>
+                      <td className="px-6 py-4 font-semibold text-ink">{i.target_role}</td>
+                      <td className="hidden px-4 py-4 text-ink-muted md:table-cell">
+                        {i.experience_level}
+                      </td>
+                      <td className="px-4 py-4">
+                        <span className={`chip ${STATUS_STYLE[i.status] || "bg-paper-200 text-ink-muted"}`}>
+                          {STATUS_LABELS[i.status] || i.status}
+                        </span>
+                      </td>
+                      <td className="hidden px-4 py-4 font-mono text-xs text-ink-muted sm:table-cell">
+                        {i.question_count === 0
+                          ? "—"
+                          : `${i.answered_count}/${i.question_count}`}
+                      </td>
+                      <td className="px-4 py-4">
+                        {i.report_overall_score != null ? (
+                          <span className={`font-mono text-sm font-bold ${scoreTone(i.report_overall_score)}`}>
+                            {i.report_overall_score}/10
+                          </span>
+                        ) : (
+                          <span className="font-mono text-xs text-ink-faint">—</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        {i.status === "completed" ? (
+                          <Link
+                            to={`/interviews/${i.id}/report`}
+                            className="font-mono text-xs font-bold uppercase tracking-widest text-brand-600 transition hover:text-brand-500"
+                          >
+                            Report →
+                          </Link>
+                        ) : (
+                          <Link
+                            to={`/interviews/${i.id}`}
+                            className="font-mono text-xs font-bold uppercase tracking-widest text-brand-600 transition hover:text-brand-500"
+                          >
+                            Open →
+                          </Link>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
       )}
     </Layout>
   );

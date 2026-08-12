@@ -2,24 +2,81 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  color-scheme: light;
+}
+
 body {
-  @apply bg-slate-50 text-slate-800 antialiased;
+  @apply bg-paper text-ink font-sans antialiased;
+  background-image: var(--body-bg);
+  min-height: 100vh;
+}
+
+/* Layered warm gradients + a faint dot grid for atmosphere instead of a flat
+   solid background. */
+#root {
+  --body-bg:
+    radial-gradient(1200px 520px at 12% -8%, rgba(203, 98, 24, 0.16), transparent 55%),
+    radial-gradient(900px 460px at 92% -4%, rgba(80, 129, 80, 0.13), transparent 52%),
+    radial-gradient(760px 420px at 55% 115%, rgba(43, 39, 33, 0.07), transparent 60%),
+    radial-gradient(rgba(43, 39, 33, 0.05) 1px, transparent 1px);
+  background-size: auto, auto, auto, 26px 26px;
+  background-attachment: fixed;
+  min-height: 100vh;
+}
+
+::selection {
+  @apply bg-brand-200 text-brand-900;
 }
 
 @layer components {
   .card {
-    @apply rounded-xl border border-slate-200 bg-white p-6 shadow-sm;
+    @apply rounded-2xl border border-paper-200 bg-paper-card p-6 shadow-card;
+    background-image: var(--card-grain);
+    background-image: radial-gradient(600px 220px at 100% 0%, rgba(203, 98, 24, 0.06), transparent 60%);
   }
+
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-brand-500 px-4 py-2.5 text-sm font-bold text-paper-50 shadow-card transition-all hover:-translate-y-0.5 hover:bg-brand-600 hover:shadow-lift active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:bg-brand-500;
   }
+
   .btn-secondary {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-paper-300 bg-paper-card px-4 py-2.5 text-sm font-semibold text-ink-soft transition-all hover:-translate-y-0.5 hover:border-ink-faint hover:bg-paper-100 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0;
   }
+
   .input {
-    @apply w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100;
+    @apply w-full rounded-xl border border-paper-300 bg-paper-50 px-3.5 py-2.5 text-sm text-ink placeholder:text-ink-faint transition focus:border-brand-400 focus:bg-paper-card focus:outline-none focus:ring-4 focus:ring-brand-100;
   }
+
   .label {
-    @apply mb-1 block text-sm font-medium text-slate-700;
+    @apply mb-1.5 block font-mono text-[11px] font-semibold uppercase tracking-widest text-ink-muted;
+  }
+
+  .eyebrow {
+    @apply font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-brand-600;
+  }
+
+  .display {
+    @apply font-display font-semibold tracking-tight text-ink;
+  }
+
+  .chip {
+    @apply inline-flex items-center rounded-full px-2.5 py-0.5 font-mono text-[11px] font-semibold uppercase tracking-wide;
+  }
+}
+
+/* Staggered entrance: children with .stagger get a delay from --d. */
+.stagger {
+  animation: rise 0.5s ease-out both;
+  animation-delay: var(--d, 0ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }
