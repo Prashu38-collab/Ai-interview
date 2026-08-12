@@ -1,7 +1,8 @@
 # 🤖 AI Interviewer
 
-An AI-powered technical interview platform. A candidate pastes their **resume** and a
-**job description**, chooses a **target role** and **experience level**, and the system
+An AI-powered technical interview platform. A candidate uploads their **resume as a
+PDF** (or pastes it as text) along with a **job description**, chooses a **target role**
+and **experience level**, and the system
 analyzes the match, generates personalized interview questions, evaluates each written
 answer with an LLM, adapts difficulty to performance, and produces a final report with
 skill-wise scores and learning recommendations.
@@ -67,11 +68,19 @@ report with skill-wise scores and concrete next steps.
 
 - 🔐 **JWT auth** — register/login, bcrypt-hashed passwords, per-user data isolation.
 - 📄 **Resume + job description analysis** — candidate skills, required skills, gaps, topics.
+- 🆙 **PDF resume upload** — drag & drop a PDF; text is extracted server-side with
+  `pypdf` and shown for confirmation before the interview is created.
 - ❓ **Personalized question generation** — role-, level- and resume-aware, deduplicated.
+  "Fresh questions" regenerates only the *unanswered* set, so you never repeat yourself.
 - ✍️ **Answer evaluation** — 0–10 score, strengths, weaknesses, feedback, missing concepts.
+- ⚠️ **Duplicate-answer detection** — pasting the same answer for multiple questions is
+  caught and flagged with a warning instead of silently passing.
 - 📈 **Adaptive difficulty** — rule-based (no ML) adjustment after every answer.
 - 📊 **Final report** — overall + skill-wise scores, summary, recommendations.
-- 🧪 **51 automated tests** with a fully mocked LLM (no API key, no network).
+- 🎨 **Distinctive UI** — warm, medium-tone "InterviewLab" aesthetic with self-hosted
+  fonts (Fraunces, Manrope, JetBrains Mono), layered gradient backgrounds and staggered
+  micro-animations.
+- 🧪 **60 automated tests** with a fully mocked LLM (no API key, no network).
 - 🐳 **Docker Compose** — `docker compose up --build` runs the entire stack.
 - 🔄 **CI/CD** — GitHub Actions: tests, frontend build, Docker build.
 
@@ -190,11 +199,12 @@ Base URL: `http://localhost:8000` (or `http://localhost:8080/api` via the Docker
 | GET | `/interviews` | ✅ | List my interviews (with score/progress) |
 | GET | `/interviews/{id}` | ✅ | Interview detail |
 | POST | `/interviews/{id}/analyze` | ✅ | AI resume + JD analysis |
-| POST | `/interviews/{id}/generate-questions` | ✅ | AI question generation (dedup) |
+| POST | `/interviews/{id}/generate-questions` | ✅ | AI question generation (dedup; `replace_pending` regenerates only unanswered) |
 | GET | `/interviews/{id}/questions` | ✅ | List questions in order |
-| POST | `/questions/{id}/answer` | ✅ | Submit + evaluate an answer |
+| POST | `/questions/{id}/answer` | ✅ | Submit + evaluate an answer (flags duplicates) |
 | POST | `/interviews/{id}/complete` | ✅ | Finalize and build the report |
 | GET | `/interviews/{id}/report` | ✅ | Fetch the final report |
+| POST | `/resume/extract` | – | Upload a PDF resume, returns its extracted text |
 | GET | `/health` | – | Liveness probe |
 
 Interactive docs: **`http://localhost:8000/docs`** (Swagger UI).
@@ -439,16 +449,17 @@ The pipeline fails the build on any test failure.
 
 ## Screenshots
 
-Captured from the running app (mock AI provider):
+Captured from the running app (mock AI provider). The UI uses a warm, medium-tone
+palette (warm paper + burnt-copper accent, Fraunces/Manrope/JetBrains Mono typography).
 
 | | |
 |---|---|
 | **Login** | **Dashboard** |
 | ![Login](docs/screenshots/login.png) | ![Dashboard](docs/screenshots/dashboard.png) |
-| **New interview** | **Interview** |
+| **New interview (PDF upload)** | **Interview** |
 | ![New interview](docs/screenshots/new-interview.png) | ![Interview](docs/screenshots/interview.png) |
-| **Report** | |
-| ![Report](docs/screenshots/report.png) | |
+| **Duplicate-answer warning** | **Report** |
+| ![Duplicate warning](docs/screenshots/duplicate-warning.png) | ![Report](docs/screenshots/report.png) |
 
 ## Future Improvements
 
