@@ -11,10 +11,8 @@ Built as a **portfolio project** demonstrating the full software development lif
 planning → architecture → AI integration → database → API → frontend → testing → Docker →
 CI/CD → deployment → documentation.
 
-> **Zero-config demo:** it runs out of the box with an offline **mock AI provider**
-> (`LLM_PROVIDER=mock`). No API key needed. Point it at a real model with one env var.
 
----
+
 
 ## Table of Contents
 
