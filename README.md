@@ -1,4 +1,4 @@
-# 🤖 AI Interviewer
+# AI Interviewer
 
 An AI-powered technical interview platform. A candidate uploads their **resume as a
 PDF** (or pastes it as text) along with a **job description**, chooses a **target role**
@@ -38,7 +38,6 @@ CI/CD → deployment → documentation.
 20. [Lessons Learned](#lessons-learned)
 21. [Author](#author)
 
----
 
 ## Overview
 
@@ -64,33 +63,33 @@ report with skill-wise scores and concrete next steps.
 
 ## Features
 
-- 🔐 **JWT auth** — register/login, bcrypt-hashed passwords, per-user data isolation.
-- 📄 **Resume + job description analysis** — candidate skills, required skills, gaps, topics.
-- 🆙 **PDF resume upload** — drag & drop a PDF; text is extracted server-side with
+-  **JWT auth** — register/login, bcrypt-hashed passwords, per-user data isolation.
+-  **Resume + job description analysis** — candidate skills, required skills, gaps, topics.
+-  **PDF resume upload** — drag & drop a PDF; text is extracted server-side with
   `pypdf` and shown for confirmation before the interview is created.
-- ❓ **Hybrid personalized question generation** — a concept bank + the interview
+-  **Hybrid personalized question generation** — a concept bank + the interview
   config + candidate history feed a question planner, which prompts the LLM for
   a question **and its evaluation rubric**; output is validated and deduplicated
   before it reaches the database. No pure "ask the model anything."
-- ✍️ **Structured answer evaluation** — the AI returns five dimensions (relevance,
+-  **Structured answer evaluation** — the AI returns five dimensions (relevance,
   understanding, correctness, completeness, reasoning), status, requirement lists
   and misconceptions — **never a raw score**. `ScoreEngine` computes the 0–10
   score deterministically with weights and hard gates, so scores are auditable.
-- 🎯 **Coaching-first feedback** — the UI leads with *what you demonstrated, what
+- **Coaching-first feedback** — the UI leads with *what you demonstrated, what
   was only partial, what's missing and what to correct*, with the score secondary.
   Targeted **follow-up questions** deepen partial/weak answers (max depth 2 per
   chain, one queued per concept).
-- ⚠️ **Duplicate-answer detection** — pasting the same answer for multiple questions is
+-  **Duplicate-answer detection** — pasting the same answer for multiple questions is
   caught and flagged with a warning instead of silently passing.
-- 📈 **Adaptive difficulty** — rule-based (no ML) adjustment after every answer.
-- 📊 **Final report** — overall + skill-wise scores, summary, recommendations.
-- 🎨 **Distinctive UI** — warm, medium-tone "InterviewLab" aesthetic with self-hosted
+-  **Adaptive difficulty** — rule-based (no ML) adjustment after every answer.
+- **Final report** — overall + skill-wise scores, summary, recommendations.
+-  **Distinctive UI** — warm, medium-tone "InterviewLab" aesthetic with self-hosted
   fonts (Fraunces, Manrope, JetBrains Mono), layered gradient backgrounds and staggered
   micro-animations.
-- 🧪 **80 automated tests + a 36-case evaluation benchmark** with a fully mocked
+- **80 automated tests + a 36-case evaluation benchmark** with a fully mocked
   LLM (no API key, no network).
-- 🐳 **Docker Compose** — `docker compose up --build` runs the entire stack.
-- 🔄 **CI/CD** — GitHub Actions: tests, frontend build, Docker build.
+-  **Docker Compose** — `docker compose up --build` runs the entire stack.
+- **CI/CD** — GitHub Actions: tests, frontend build, Docker build.
 
 ## Architecture
 
